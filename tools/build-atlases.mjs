@@ -59,7 +59,11 @@ export function buildAtlas(swfName) {
   const json = {
     textures: [
       {
-        image: `${swfName}.png`,
+        // Self-contained site-root-relative path (relative to public/).
+        // Phaser's multiatlas loader resolves this against loader.path
+        // (empty by default), NOT against the JSON file's directory —
+        // see docs/04-asset-pipeline.md.
+        image: `assets/generated/atlases/${swfName}.png`,
         format: 'RGBA8888',
         size: { w: width, h: height },
         scale: 1,

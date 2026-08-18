@@ -22,7 +22,18 @@ describe.skipIf(!present)('generated atlas contract', () => {
   it('uses the Phaser multi-atlas shape (textures array)', () => {
     expect(Array.isArray(atlas.textures)).toBe(true);
     expect(atlas.textures).toHaveLength(1);
-    expect(atlas.textures[0].image).toBe('ingredient_asset.png');
+  });
+
+  it('image is site-root-relative and resolves under public/', () => {
+    // Phaser multiatlas resolves textures[].image against loader.path
+    // (empty), NOT against the JSON directory — the path must be
+    // self-contained relative to public/ (see docs/04-asset-pipeline.md).
+    const image = atlas.textures[0].image;
+    expect(image).toBe('assets/generated/atlases/ingredient_asset.png');
+    expect(
+      fs.existsSync(path.resolve(GEN, '..', '..', image)),
+      `public/${image} must exist`,
+    ).toBe(true);
   });
 
   it('declares image size matching the PNG file', () => {

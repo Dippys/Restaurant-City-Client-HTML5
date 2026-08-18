@@ -103,11 +103,15 @@ Verified facts about the extraction (recorded so M1 reuses them):
 The loader (`src/net`/game layer) validates manifest entries and fails with
 actionable errors naming the missing file.
 
-**Phaser loading rule:** the JSON is a multi-atlas (`textures` array), so it
+**Phaser loading rules:** the JSON is a multi-atlas (`textures` array), so it
 MUST be loaded with `this.load.multiatlas(key, jsonUrl)` — `load.atlas`
 treats its second argument as a texture image URL and silently produces an
-empty/missing texture. `tests/lib/atlas-contract.test.mjs` guards the JSON
-shape the multiatlas loader consumes.
+empty/missing texture. Additionally, `textures[].image` is a
+**site-root-relative path** (relative to `public/`), not a path relative to
+the JSON file: Phaser's multiatlas loader resolves image URLs against
+`loader.path` (empty by default), NOT against the JSON's directory. Callers
+must not pass a `path` argument to `multiatlas` — the JSON is
+self-contained. `tests/lib/atlas-contract.test.mjs` guards both rules.
 
 ## Naming rules
 
