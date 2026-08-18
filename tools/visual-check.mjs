@@ -118,6 +118,27 @@ try {
   check('owned items rendered', items > 0, `items=${items}`);
   const depthTrace = await page.evaluate(() => document.documentElement.dataset.depthTrace ?? '');
   console.log('  depth trace:', depthTrace);
+  // Every wall-edge decoration must tie its wall's depth (insertion order
+  // then puts the decoration above — the original mounts windows on walls).
+  const entries = depthTrace.split('|').filter(Boolean).map((e) => {
+    const m = e.match(/^(\d+)@\((\d+),(\d+)\)r(\d+)d(\d+)$/);
+    return m ? { id: m[1], x: Number(m[2]), y: Number(m[3]), rot: Number(m[4]), depth: Number(m[5]) } : null;
+  }).filter(Boolean);
+  const wallAt = new Map();
+  for (const e of entries) {
+    if (e.id === '3090000') wallAt.set(`${e.x},${e.y}`, e.depth);
+  }
+  let depthOk = true;
+  const bad = [];
+  for (const e of entries) {
+    if (e.id === '3090000' || e.id === '3090001') continue;
+    const wallDepth = wallAt.get(`${e.x},${e.y}`);
+    if (wallDepth !== undefined && e.depth !== wallDepth) {
+      depthOk = false;
+      bad.push(`${e.id}@(${e.x},${e.y}) d${e.depth} vs wall ${wallDepth}`);
+    }
+  }
+  check('wall decorations tie wall depth', depthOk, bad.slice(0, 3).join(' | '));
 
   // 5. Editor: click "edit" (bottom-right, inside the text bounds).
   await page.mouse.click(686, 568);
