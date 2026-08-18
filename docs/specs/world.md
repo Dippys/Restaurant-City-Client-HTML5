@@ -125,7 +125,7 @@ The "base point" (anchor) for sorting and screen placement is the item's
 
 ## 6. Rendering rules
 
-- `room` is a `BaseObject` with a background fill `0xB3E5B4`-ish `11788396` over
+- `room` is a `BaseObject` with a background fill colour `11788396` over
   `(-2000,-2000,4000,4000)` — `WorldRestaurant.init L457-461`.
 - Layers inside `room`: `Road` MovieClip, `floorLayer` (`baseFloor` + `baseOutsideAreaFloor`),
   road `RoadTrees` (each tree is a `RestaurantTreeObject`), `Billboard`, garden plots, then
