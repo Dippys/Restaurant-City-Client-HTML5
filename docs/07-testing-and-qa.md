@@ -45,6 +45,20 @@ tests green · browser smoke pass · acceptance criteria demoed with captures ·
 `docs/status.md` updated. Parity evidence is stored under `tests/golden/`,
 not described in prose.
 
+## Known benign console noise
+
+- **Firefox:** `WebGL warning: texImage: Alpha-premult and y-flip are
+  deprecated for non-DOM-Element uploads` — Phaser's pixel-store flags are
+  ignored for buffer uploads; harmless, Firefox-only.
+- **Firefox:** `WebGL warning: generateMipmap: Tex image … incurring lazy
+  initialization` — Firefox's deferred texture init; informational.
+- **Chrome/Edge** don't emit either. No correctness impact. Revisit
+  mipmap/filter policy during the M3+ performance pass (pixel-art atlases
+  will likely want `NEAREST`, no mipmaps), not before.
+- `An AudioContext was prevented from starting automatically` — browser
+  autoplay policy; expected until audio exists (M1+) and a user gesture
+  resumes the context.
+
 ## Known Flash-specific pitfalls to test for
 
 - Off-by-one tile footprints at area edges (original had tile rules).
