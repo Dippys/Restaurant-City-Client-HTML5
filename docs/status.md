@@ -6,13 +6,14 @@ Living tracker. **Update this file at the end of every working session**
 ## Current
 
 - Phase: **M0 — Scaffold & pipeline proof**
-- Focus: project scaffold compiles; first pipeline script; proxy verified.
+- Focus: scaffold verified (type-check/build), then first pipeline script
+  (`tools/extract-symbols.mjs` for `ingredient_asset.swf`).
 
 ## Milestones
 
 | # | Milestone | State | Evidence |
 |---|---|---|---|
-| M0 | Scaffold & pipeline proof | not started | — |
+| M0 | Scaffold & pipeline proof | in progress | scaffold committed; install/check/build in session log below |
 | M1 | Asset pipeline complete | not started | — |
 | M2 | Core loop | not started | — |
 | M3 | Restaurant gameplay | not started | — |
@@ -24,7 +25,7 @@ Living tracker. **Update this file at the end of every working session**
 
 | Date | What | Done by |
 |---|---|---|
-| (first session) | (example: M0 scaffold created, npm install verified) | — |
+| 2026-07-31 | Program bootstrapped: `client-html5/` scaffold (Vite+TS+Phaser 3, strict tsconfig, proxy to `:8090`), full docs set (`docs/01-11`, 7 ADRs, status/roadmap), workspace `AGENTS.md` + `README.md`, 7 skills in `.agents/skills/`, git repo initialized with first commit. npm install + type-check/build verification in progress. | setup session |
 
 ## Blockers
 

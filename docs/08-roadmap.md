@@ -21,7 +21,7 @@ criteria are demonstrated with evidence (see `07-testing-and-qa.md`) and
 - [ ] `tools/extract-symbols.mjs` + `tools/build-atlases.mjs` convert
   `ingredient_asset.swf` (12 symbols+ coverage, report green).
 - [ ] Boot scene renders one exported animated sprite.
-- [ ] `git init` + first commit; `docs/status.md` template filled.
+- [x] `git init` + first commit; `docs/status.md` template filled.
 
 ## M1 — Asset pipeline complete
 
