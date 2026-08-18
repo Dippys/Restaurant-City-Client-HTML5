@@ -5,11 +5,9 @@ Living tracker. **Update this file at the end of every working session**
 
 ## Current
 
-- Phase: **M2 — Core loop**
-- Focus: net + core logic layers done (codec/rpc/session/audit writers,
-  iso/street/items/editor state machines, GameState). Next: the Phaser
-  scenes — street + restaurant render from a live profile, camera, and
-  editor UI wiring (buy/place/move/sell against the live backend).
+- Phase: **M2 — Core loop (wire layer done; visual pass pending)**
+- Focus: user verifies the live scenes on :5173 (street, restaurant,
+  editor save/reload). Then: close M2, start M3.
 
 ## Milestones
 
