@@ -52,14 +52,30 @@ export class RoomMap {
    * getItemHeightAtTile/getTileTopHeight): for each item in row/column
    * order, its height = the tallest covered tile's top height, then the
    * item's own top height is pushed onto its tiles.
+   *
+   * Wall, wall-decoration, wallpaper, and floor-tile items do NOT stack:
+   * decorations mount on the wall and floor tiles are flat — giving them
+   * heights pushed the walls 40px above their decorations (windows drew
+   * under walls). Ties keep insertion order (the wall precedes its
+   * decorations, so decorations draw over it).
    */
   computeStackHeights(): void {
     const tileTop = new Map<number, number>();
     const sorted = [...this.items.values()].sort(
-      (a, b) => a.tileY - b.tileY || a.tileX - b.tileX || a.configId.localeCompare(b.configId),
+      (a, b) => a.tileY - b.tileY || a.tileX - b.tileX,
     );
     this.stackHeights.clear();
     for (const item of sorted) {
+      const stacks = !(
+        item.wallItem ||
+        item.wallDecorationItem ||
+        item.wallpaperItem ||
+        item.floorTileItem
+      );
+      if (!stacks) {
+        this.stackHeights.set(item.id, 0);
+        continue;
+      }
       let top = 0;
       for (const t of coveredTiles(item, item.tileX, item.tileY)) {
         top = Math.max(top, tileTop.get(this.tileKey(t.x, t.y)) ?? 0);

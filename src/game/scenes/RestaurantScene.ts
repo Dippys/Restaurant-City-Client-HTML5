@@ -226,6 +226,12 @@ export class RestaurantScene extends Phaser.Scene {
     // Headless-check hooks.
     document.documentElement.dataset.walls = String(wallCount);
     document.documentElement.dataset.items = String(itemCount);
+    const depthTrace = this.roomMap
+      .all()
+      .filter((i) => i.tileX === 0 || i.tileY === 0)
+      .map((i) => `${i.configId}@(${i.tileX},${i.tileY})r${i.rotation}d${Math.round(i.tileY * 20 + i.tileX) * 256 + this.roomMap.stackHeightOf(i.id)}`)
+      .join('|');
+    document.documentElement.dataset.depthTrace = depthTrace.slice(0, 900);
     // Phaser containers sort children by depth; nothing else to do.
   }
 

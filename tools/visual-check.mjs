@@ -116,6 +116,8 @@ try {
   const items = Number(await page.evaluate(() => document.documentElement.dataset.items ?? '0'));
   check('default walls rendered', walls === 15, `walls=${walls}`);
   check('owned items rendered', items > 0, `items=${items}`);
+  const depthTrace = await page.evaluate(() => document.documentElement.dataset.depthTrace ?? '');
+  console.log('  depth trace:', depthTrace);
 
   // 5. Editor: click "edit" (bottom-right, inside the text bounds).
   await page.mouse.click(686, 568);
