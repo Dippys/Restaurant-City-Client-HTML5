@@ -1,0 +1,23 @@
+{
+  "name": "rc-html5-client",
+  "private": true,
+  "version": "0.1.0",
+  "description": "HTML5 rebuild of the Restaurant City 0.9.143a game client and assets",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  }
+}

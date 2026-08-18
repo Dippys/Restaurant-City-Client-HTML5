@@ -1,0 +1,11 @@
+# Dependencies / build output
+node_modules/
+dist/
+
+# Generated runtime assets (built by tools/ from the original SWFs — see docs/04-asset-pipeline.md)
+public/assets/generated/
+
+# Local test artifacts
+tests/golden/.tmp/
+*.log
+.DS_Store
