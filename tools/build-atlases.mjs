@@ -1,20 +1,22 @@
 /**
  * Stage 2: build-atlases
  *
- * Packs the extracted frame PNGs of one SWF into a single atlas PNG and a
- * Phaser multi-atlas JSON. Outputs (relative to client-html5/public/):
+ * Packs the extracted frame PNGs of one SWF into one or more atlas PNGs
+ * (pages) and a Phaser multi-atlas JSON listing every page as a texture.
+ * Outputs (relative to client-html5/public/):
  *
- *   assets/generated/atlases/<swf>.png
+ *   assets/generated/atlases/<swf>_<page>.png
  *   assets/generated/atlases/<swf>.json
  *
  *   node tools/build-atlases.mjs [swfName]
  *
- * Image format note (ADR-0004): PNG tier for M0 (lossless, zero
+ * Image format note (ADR-0004): PNG tier for M0/M1 (lossless, zero
  * dependencies beyond pngjs). WebP tier is a later pipeline upgrade.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { PNG } from 'pngjs';
 import { packFrames } from './lib/packer.mjs';
 import { SWFS } from './lib/swf-config.mjs';
@@ -39,36 +41,67 @@ export function buildAtlas(swfName) {
   }
   frames.sort((a, b) => a.key.localeCompare(b.key));
 
-  const { width, height, placements } = packFrames(frames);
-  const byKey = new Map(placements.map((p) => [p.key, p]));
-
-  const atlas = new PNG({ width, height });
+  // Deduplicate byte-identical frames: timeline animations repeat identical
+  // raster content constantly (game_asset alone has 7184 frames). Duplicate
+  // keys share one atlas rect — the multi-atlas JSON allows it.
+  const repByHash = new Map(); // hash -> first frame key
+  const uniqueFrames = [];
   for (const f of frames) {
-    const src = PNG.sync.read(fs.readFileSync(f.abs));
-    const p = byKey.get(f.key);
-    if (!p) {
-      throw new Error(`no placement for frame ${f.key}`);
+    const hash = createHash('sha256').update(fs.readFileSync(f.abs)).digest('hex').slice(0, 16);
+    const rep = repByHash.get(hash);
+    if (rep) {
+      f.rep = rep;
+    } else {
+      repByHash.set(hash, f.key);
+      uniqueFrames.push(f);
     }
-    PNG.bitblt(src, atlas, 0, 0, f.w, f.h, p.x, p.y);
+  }
+  if (uniqueFrames.length < frames.length) {
+    console.log(
+      `  dedup: ${frames.length - uniqueFrames.length}/${frames.length} frames identical to earlier frames`,
+    );
   }
 
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-  const pngFile = path.join(OUT_DIR, `${swfName}.png`);
-  fs.writeFileSync(pngFile, PNG.sync.write(atlas, { colorType: 6, inputColorType: 6 }));
+  // Clean previous outputs for this SWF before writing (regeneration).
+  for (const stale of fs.readdirSync(OUT_DIR).filter(
+    (f) => f.startsWith(`${swfName}_`) || f === `${swfName}.json` || f === `${swfName}.png`,
+  )) {
+    fs.unlinkSync(path.join(OUT_DIR, stale));
+  }
 
-  const json = {
-    textures: [
-      {
-        // Self-contained site-root-relative path (relative to public/).
-        // Phaser's multiatlas loader resolves this against loader.path
-        // (empty by default), NOT against the JSON file's directory —
-        // see docs/04-asset-pipeline.md.
-        image: `assets/generated/atlases/${swfName}.png`,
-        format: 'RGBA8888',
-        size: { w: width, h: height },
-        scale: 1,
-        frames: frames.map((f) => {
-          const p = byKey.get(f.key);
+  const { pages } = packFrames(uniqueFrames);
+  const oversized = uniqueFrames.filter((f) => f.w + 4 > 2048 || f.h + 4 > 2048);
+  if (oversized.length > 0) {
+    console.log(
+      `  note: ${oversized.length} oversized frame(s) get their own page, e.g. ` +
+        `${oversized[0].key} (${oversized[0].w}x${oversized[0].h})`,
+    );
+  }
+  const textures = [];
+  pages.forEach((page, pageIndex) => {
+    const byKey = new Map(page.placements.map((p) => [p.key, p]));
+    const atlas = new PNG({ width: page.width, height: page.height });
+    for (const f of uniqueFrames) {
+      const p = byKey.get(f.key);
+      if (!p) continue;
+      const src = PNG.sync.read(fs.readFileSync(f.abs));
+      PNG.bitblt(src, atlas, 0, 0, f.w, f.h, p.x, p.y);
+    }
+    const pageName = `${swfName}_${pageIndex}`;
+    const pngFile = path.join(OUT_DIR, `${pageName}.png`);
+    fs.writeFileSync(pngFile, PNG.sync.write(atlas, { colorType: 6, inputColorType: 6 }));
+
+    textures.push({
+      // Self-contained site-root-relative path (Phaser multiatlas resolves
+      // textures[].image against loader.path, NOT the JSON directory).
+      image: `assets/generated/atlases/${pageName}.png`,
+      format: 'RGBA8888',
+      size: { w: page.width, h: page.height },
+      scale: 1,
+      frames: frames
+        .filter((f) => byKey.has(f.rep ?? f.key))
+        .map((f) => {
+          const p = byKey.get(f.rep ?? f.key);
           return {
             filename: f.key,
             rotated: false,
@@ -78,23 +111,34 @@ export function buildAtlas(swfName) {
             sourceSize: { w: p.w, h: p.h },
           };
         }),
-      },
-    ],
+    });
+  });
+
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  const json = {
+    textures,
     meta: {
       app: 'rc-html5-pipeline',
       version: '1.0',
       swf: swfName,
-      image: `${swfName}.png`,
-      size: { w: width, h: height },
+      image: `${swfName}_0.png`,
+      size: { w: pages[0].width, h: pages[0].height },
     },
   };
   const jsonFile = path.join(OUT_DIR, `${swfName}.json`);
   fs.writeFileSync(jsonFile, `${JSON.stringify(json, null, 2)}\n`);
 
   console.log(
-    `atlas: ${swfName} -> ${width}x${height}, ${frames.length} frames (${path.relative(path.resolve(HERE, '..'), pngFile)})`,
+    `atlas: ${swfName} -> ${pages.length} page(s), ${frames.length} frames (${uniqueFrames.length} unique) ` +
+      `(${path.relative(path.resolve(HERE, '..'), jsonFile)})`,
   );
-  return { pngFile, jsonFile, atlas: json, frameCount: frames.length, size: { width, height } };
+  return {
+    jsonFile,
+    atlas: json,
+    frameCount: frames.length,
+    pages: pages.length,
+    size: { width: pages[0].width, height: pages[0].height },
+  };
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file:///${process.argv[1].replace(/\\/g, '/')}`).href) {

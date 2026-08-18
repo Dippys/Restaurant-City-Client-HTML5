@@ -30,16 +30,20 @@ them.
 
 ## Target formats
 
-- **Sprites:** PNG atlases + Phaser multi-atlas JSON for M0 (lossless PNG
-  tier of ADR-0004; WebP tier is a later pipeline upgrade), one atlas per
-  source SWF per scale tier. Power of two where practical; max 4096px.
-- **Audio:** ogg/webm + mp3 dual-format with a per-track manifest
-  (Web Audio via Phaser). Export from `sound_asset.swf`'s embedded MP3s.
+- **Sprites:** PNG atlases + Phaser multi-atlas JSON for M0/M1 (lossless PNG
+  tier of ADR-0004; WebP tier is a later pipeline upgrade). Atlases are
+  **paged**: when a page would exceed 2048x2048 the packer starts a new
+  texture image `<swf>_<n>.png`; the JSON lists every page in `textures`.
+  One atlas per source SWF.
+- **Audio:** mp3 passthrough of the original embedded assets from
+  `sound_asset.swf` (highest fidelity; browser-native decode). No ffmpeg on
+  this machine, so ogg/webm tiers are deferred (ADR-0009). Each track keeps
+  its linkage id (e.g. `SfxCoinDrop`).
 - **Data:** typed JSON generated from the `bin-xml` files by the readers in
   `src/net/data/` (see doc 11). The client consumes the JSON at runtime.
 - **Strings:** lang JSON per locale from `lang_en[1].bin` / `lang_fr[1].bin`.
 
-## Implemented tooling (M0, verified against `ingredient_asset.swf`)
+## Implemented tooling (M0/M1, verified against all 7 atlas SWFs)
 
 | Script | What it does | FFDec invocation used |
 |---|---|---|
@@ -65,8 +69,17 @@ Verified facts about the extraction (recorded so M1 reuses them):
 - `ingredient_asset.swf`: 92 linked sprites, 161 frames total, 65 unnamed
   inner wrapper sprites (composited into their parents, not linked —
   excluded), 100% coverage achieved.
+- Symbol kinds across all SWFs: sprites everywhere, plus 21 bitmap symbols
+  in `indoor_asset` (BitsLossless2, exported via `-export image`) and one
+  ScalingGrid (shares its sprite's chid). `extract-symbols.mjs` routes by
+  kind and fails loudly on anything unhandled.
+- Atlases are paged (2048x2048) and byte-identical frames are deduplicated
+  (shared rects, duplicate JSON entries): game_asset 7184 -> 5992 unique
+  across 340 pages; indoor 5286 -> 4084 unique across 12 pages.
+  game_asset's atlas weight is tracked as M3 performance work.
 - Pipeline output is reproducible: two consecutive runs produce
-  byte-identical artifacts (verified by SHA-256 comparison).
+  byte-identical artifacts (verified by SHA-256 comparison over all 581
+  generated files).
 
 ## Pipeline stages
 
@@ -87,14 +100,14 @@ Verified facts about the extraction (recorded so M1 reuses them):
 {
   "version": 1,
   "atlases": [
-    { "id": "indoor", "file": "atlases/indoor.webp",
-      "json": "atlases/indoor.json", "source": "indoor_asset.swf" }
+    { "id": "indoor", "file": "atlases/indoor_0.png", "json": "atlases/indoor.json",
+      "source": "indoor_asset.swf", "pages": 3 }
   ],
-  "audio": [ { "id": "music_main", "ogg": "audio/music_main.ogg",
-               "mp3": "audio/music_main.mp3" } ],
+  "audio": [ { "id": "SfxCoinDrop", "file": "audio/SfxCoinDrop.mp3", "kind": "sfx" } ],
   "data": [ { "id": "ingredients", "file": "data/ingredients.json",
               "source": "ingredient[1].bin" } ],
   "langs": [ { "code": "en", "file": "data/lang_en.json" } ],
+  "excluded": [ { "source": "model[1].bin", "reason": "Collada 3D — ADR-0003" } ],
   "coverage": { "ingredient_asset": { "symbols": 92, "exported": 92,
                   "frames": 161, "pct": 100 } }
 }

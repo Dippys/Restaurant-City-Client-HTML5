@@ -17,4 +17,7 @@ Planned contents (M0+):
 - `codec.ts` — primitive reader/writer port
 - `rpc-client.ts` — session, batch, per-call request/response mapping
 - `calls/` — one module per msgType (profile, friends, mails, saveProfile...)
-- `data/` — readers for the `bin-xml` files (ingredient, recipe, lang, ...)
+- `data/` — typed runtime models for the generated data JSON
+  (`public/assets/generated/data/*.json`). The bin-xml READERS live in
+  `tools/lib/data/` (ADR-0008) and run at pipeline time, never in the
+  browser.

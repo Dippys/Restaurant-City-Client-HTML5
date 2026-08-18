@@ -5,18 +5,18 @@ Living tracker. **Update this file at the end of every working session**
 
 ## Current
 
-- Phase: **M1 — Asset pipeline complete**
-- Focus: apply the proven pipeline to the remaining atlas SWFs
-  (`perk_asset`, `avatar_asset`, `game_asset`, `indoor_asset`,
-  `outdoor_asset`, `preloader_asset`), then `build-audio.mjs` and the
-  `bin-xml` data readers.
+- Phase: **M2 — Core loop**
+- Focus: handshake + profile RPC, `GameState` from `getUserProfile`,
+  street + restaurant render from save, camera pan/zoom, editor
+  buy/place/move/sell with save round-trip.
 
 ## Milestones
 
 | # | Milestone | State | Evidence |
 |---|---|---|---|
 | M0 | Scaffold & pipeline proof | **done** | `tests/golden/m0/README.md` |
-| M1 | Asset pipeline complete | not started | — |
+| M1 | Asset pipeline complete | **done** | `tests/golden/m1/README.md` |
+| M2 | Core loop | not started | — |
 | M1 | Asset pipeline complete | not started | — |
 | M2 | Core loop | not started | — |
 | M3 | Restaurant gameplay | not started | — |
@@ -28,6 +28,7 @@ Living tracker. **Update this file at the end of every working session**
 
 | Date | What | Done by |
 |---|---|---|
+| 2026-07-31 | **M1 closed.** All 7 atlas SWFs at 100% symbol coverage (ingredient 92, perk 17, avatar 326, game 798/7184f, indoor 893/5286f incl. 21 bitmaps, outdoor 350/3991f, preloader 5/204f); paged packer + frame dedup; 18 audio tracks (mp3 passthrough, ADR-0009); all bin-xml -> typed JSON (readers in tools/lib/data, ADR-0008; lang_en 608, lang_fr 34, 20 challenges); manifest + verify green; 35/35 tests; full-rerun SHA-256 reproducible (581 files); live probes 200 through :5173. Known follow-ups: game_asset atlas weight (M3 perf), preloader wide frames (M2). Evidence: `tests/golden/m1/README.md`. | M1 session |
 | 2026-07-31 | **M0 closed.** Pipeline tooling (extract-symbols, build-atlases, build-manifest, verify-pipeline, preview-frames) implemented; `ingredient_asset.swf` at 92/92 symbols (100%), 161 frames, labeled keys (`apple/idle`, `apple/grey`); BootScene renders animated atlas sprite + proxy/coverage status; dev proxy verified (2764 bytes identical to backend); 12/12 tests; reproducible SHA-256 outputs. Evidence: `tests/golden/m0/README.md`. | M0 session |
 | 2026-07-31 | Program bootstrapped: `client-html5/` scaffold (Vite+TS+Phaser 3, strict tsconfig, proxy to `:8090`), full docs set (`docs/01-11`, 7 ADRs, status/roadmap), workspace `AGENTS.md` + `README.md`, 7 skills in `.agents/skills/`, git repo initialized. Verified: `npm install`, `npm run check` (strict TS), `npm run build` all pass (commit `1bba03f`). | setup session |
 

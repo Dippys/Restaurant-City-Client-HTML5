@@ -1,21 +1,24 @@
 /**
  * Stage 3: build-manifest
  *
- * Emits the runtime manifest (contract in docs/04-asset-pipeline.md) and a
- * per-SWF coverage report. Reads work/<swf>/extract.json plus the atlas
- * JSON produced by build-atlases.
+ * Emits the runtime manifest (contract in docs/04-asset-pipeline.md) and
+ * the per-SWF coverage report. Reads work/<swf>/extract.json plus the
+ * atlas JSONs produced by build-atlases, the audio dir produced by
+ * build-audio, and the data dir produced by build-data.
  *
- *   node tools/build-manifest.mjs [swfName ...]   (default: ingredient_asset)
+ *   node tools/build-manifest.mjs [swfName ...]   (default: all atlas SWFs)
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ATLAS_SWFS, SWFS } from './lib/swf-config.mjs';
+import { DATA_FILES, EXCLUDED_SOURCES, LANGS } from './lib/data/data-config.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WORK = path.join(HERE, '.work');
 const GEN_DIR = path.resolve(HERE, '..', 'public', 'assets', 'generated');
 const ATLAS_DIR = path.join(GEN_DIR, 'atlases');
+const AUDIO_DIR = path.join(GEN_DIR, 'audio');
 
 export function buildManifest(swfNames) {
   const atlases = [];
@@ -30,7 +33,9 @@ export function buildManifest(swfNames) {
     );
     const atlasJsonFile = path.join(ATLAS_DIR, `${swfName}.json`);
     const atlas = JSON.parse(fs.readFileSync(atlasJsonFile, 'utf8'));
-    const atlasKeys = new Set(atlas.textures.flatMap((t) => t.frames.map((f) => f.filename)));
+    const atlasKeys = new Set(
+      atlas.textures.flatMap((t) => t.frames.map((f) => f.filename)),
+    );
     const expectedKeys = new Set(
       extract.symbols.flatMap((s) => s.frames.map((f) => f.key)),
     );
@@ -49,41 +54,81 @@ export function buildManifest(swfNames) {
       exported,
       frames: extract.counts.frames,
       pct,
+      pages: atlas.textures.length,
       excluded: extract.excluded,
     };
     atlases.push({
       id: swfName,
-      file: `atlases/${swfName}.png`,
+      file: `atlases/${swfName}_0.png`,
       json: `atlases/${swfName}.json`,
       source: cfg.source,
+      pages: atlas.textures.length,
     });
   }
+
+  const audio = fs.existsSync(AUDIO_DIR)
+    ? fs
+        .readdirSync(AUDIO_DIR)
+        .filter((f) => f.endsWith('.mp3'))
+        .sort()
+        .map((f) => ({
+          id: f.replace(/\.mp3$/, ''),
+          file: `audio/${f}`,
+          kind: /^Music/i.test(f) ? 'music' : 'sfx',
+        }))
+    : [];
+
+  const data = DATA_FILES.filter((d) => d.kind !== 'excluded').map((d) => ({
+    id: d.id,
+    file: `data/${d.id}.json`,
+    source: d.source,
+  }));
+
+  const langs = LANGS.map((l) => ({
+    code: l.code,
+    file: `data/lang_${l.code}.json`,
+    source: l.source,
+  }));
+
+  const excluded = [
+    ...DATA_FILES.filter((d) => d.kind === 'excluded').map((d) => ({
+      source: d.source,
+      reason: d.reason,
+    })),
+    ...EXCLUDED_SOURCES,
+  ];
 
   const manifest = {
     version: 1,
     atlases,
-    audio: [],
-    data: [],
-    langs: [],
+    audio,
+    data,
+    langs,
+    excluded,
     coverage,
   };
   const manifestFile = path.join(GEN_DIR, 'manifest.json');
   fs.mkdirSync(GEN_DIR, { recursive: true });
   fs.writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
 
-  console.log('manifest:', manifestFile);
+  console.log(
+    `manifest: ${manifestFile} (${atlases.length} atlases, ${audio.length} audio, ${data.length} data, ${langs.length} langs)`,
+  );
   for (const [name, c] of Object.entries(coverage)) {
     console.log(
-      `  coverage ${name}: ${c.exported}/${c.symbols} symbols (${c.pct}%), ${c.frames} frames`,
+      `  coverage ${name}: ${c.exported}/${c.symbols} symbols (${c.pct}%), ${c.frames} frames, ${c.pages} page(s)`,
     );
     for (const ex of c.excluded) {
       console.log(`    excluded chid ${ex.chid}${ex.name ? ` "${ex.name}"` : ''}: ${ex.reason}`);
     }
+  }
+  for (const ex of excluded) {
+    console.log(`  excluded ${ex.source}: ${ex.reason}`);
   }
   return manifest;
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file:///${process.argv[1].replace(/\\/g, '/')}`).href) {
   const names = process.argv.slice(2);
-  buildManifest(names.length > 0 ? names : ['ingredient_asset']);
+  buildManifest(names.length > 0 ? names : ATLAS_SWFS);
 }

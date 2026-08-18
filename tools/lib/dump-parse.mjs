@@ -1,4 +1,21 @@
 /**
+ * Collect the Define* tag kind for every top-level character id
+ * (DefineSprite, DefineBitsLossless2, DefineButton2, DefineShape2, ...).
+ * Used to route linked symbols to the right FFDec export.
+ */
+export function parseDefineKinds(text) {
+  /** @type {Map<number, string>} */
+  const kinds = new Map();
+  for (const raw of text.split(/\r?\n/)) {
+    const m = raw.match(/Define(\w+) \(chid: (\d+)\)/);
+    if (m) {
+      kinds.set(Number(m[2]), m[1]);
+    }
+  }
+  return kinds;
+}
+
+/**
  * Parse `ffdec -dumpSWF` text output.
  *
  * dumpSWF prints a tag tree with indentation:

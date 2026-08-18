@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ffdec } from './lib/ffdec.mjs';
-import { parseDump } from './lib/dump-parse.mjs';
+import { parseDefineKinds, parseDump } from './lib/dump-parse.mjs';
 import { frameKey } from './lib/keys.mjs';
 import { SWFS } from './lib/swf-config.mjs';
 
@@ -58,9 +58,10 @@ export function runExtract(swfName) {
   const csvDir = path.join(work, 'symbolclass');
   fs.mkdirSync(work, { recursive: true });
 
-  // 1. Tag tree -> sprite frame labels.
+  // 1. Tag tree -> sprite frame labels + symbol kinds.
   const dump = ffdec(['-dumpSWF', swfPath]);
   const spriteFrames = parseDump(dump.stdout);
+  const symbolKinds = parseDefineKinds(dump.stdout);
 
   // 2. Linkage tables (ExportAssets + SymbolClass) -> name per chid.
   const csvOut = ffdec(['-export', 'symbolClass', csvDir, swfPath]);
@@ -70,10 +71,23 @@ export function runExtract(swfName) {
   }
   const symbolsByName = parseSymbolCsv(fs.readFileSync(csvFile, 'utf8'));
 
-  // 3. Sprite frame PNGs.
+  // 3. Sprite frame PNGs (all sprites, frames included).
   const spriteOut = ffdec(['-format', 'sprite:png', '-export', 'sprite', spriteDir, swfPath]);
   if (!/OK/.test(spriteOut.stdout + spriteOut.stderr)) {
     throw new Error(`sprite export failed: ${spriteOut.stderr || spriteOut.stdout}`);
+  }
+
+  // 3b. Bitmap symbols (BitsLossless2 etc.) — exported as plain images.
+  const bitmapKinds = new Set(
+    [...symbolKinds.values()].filter((k) => /^Bits/.test(k)),
+  );
+  let imgDir = null;
+  if (bitmapKinds.size > 0) {
+    imgDir = path.join(work, 'images');
+    const imgOut = ffdec(['-format', 'image:png', '-export', 'image', imgDir, swfPath]);
+    if (!/OK/.test(imgOut.stdout + imgOut.stderr)) {
+      throw new Error(`image export failed: ${imgOut.stderr || imgOut.stdout}`);
+    }
   }
 
   // 4. Normalize into extract.json.
@@ -98,6 +112,36 @@ export function runExtract(swfName) {
     if (!name) {
       excluded.push({ chid, name: '', reason: 'linked with no export name' });
       continue;
+    }
+    const kind = symbolKinds.get(chid) ?? 'Sprite';
+    if (/^Bits/.test(kind)) {
+      // Bitmap symbol: exported by the image pass as <chid>_<ClassName>.png.
+      const imgFiles = fs
+        .readdirSync(imgDir)
+        .filter((f) => f.startsWith(`${chid}_`) && f.endsWith('.png'))
+        .sort();
+      if (imgFiles.length === 0) {
+        throw new Error(`bitmap symbol "${name}" (chid ${chid}) not exported`);
+      }
+      const frames = imgFiles.map((file, i) => {
+        const { w, h } = readPngSize(path.join(imgDir, file));
+        return {
+          file: path.relative(work, path.join(imgDir, file)),
+          key: frameKey(swfName, name, null, i + 1),
+          label: null,
+          index: i + 1,
+          w,
+          h,
+        };
+      });
+      symbols.push({ chid, name, kind, frames });
+      continue;
+    }
+    if (kind !== 'Sprite' && kind !== 'ScalingGrid') {
+      // ScalingGrid tags share their target sprite's chid; sprites cover them.
+      throw new Error(
+        `linked symbol "${name}" (chid ${chid}) has unhandled kind "${kind}" — extend extract-symbols.mjs`,
+      );
     }
     const dirName = spriteDirs.get(chid);
     if (!dirName) {
@@ -124,7 +168,7 @@ export function runExtract(swfName) {
     if (frames.length === 0) {
       throw new Error(`sprite "${name}" (chid ${chid}) exported no frames`);
     }
-    symbols.push({ chid, name, frames });
+    symbols.push({ chid, name, kind: 'Sprite', frames });
   }
 
   const extract = {

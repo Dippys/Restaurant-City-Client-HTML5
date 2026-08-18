@@ -26,13 +26,16 @@ criteria are demonstrated with evidence (see `07-testing-and-qa.md`) and
 
 ## M1 — Asset pipeline complete
 
-- [ ] All 9 asset SWFs: 100% symbol coverage, atlases + multi-atlas JSON.
-- [ ] `sound_asset.swf`: audio exported (ogg/webm + mp3) and playable.
-- [ ] All `bin-xml` files -> typed JSON via `src/net/data/` readers; reader
-  unit tests against file bytes.
-- [ ] `manifest.json` generated and validated by the loader; regeneration is
-  reproducible (run twice, identical manifest).
-- [ ] `docs/11-data-formats.md` completed with verified reader mappings.
+- [x] All 9 asset SWFs: 100% symbol coverage, atlases + multi-atlas JSON
+  (7 atlas SWFs converted; `game.swf`/`preloader.swf` are pure code).
+- [x] `sound_asset.swf`: audio exported (mp3 passthrough of the original
+  assets — ADR-0009) and playable (click-to-play proof in BootScene).
+- [x] All `bin-xml` files -> typed JSON via tool-time readers
+  (`tools/lib/data/`); reader unit tests against real file bytes
+  (13/13 data tests).
+- [x] `manifest.json` generated and validated by the loader; regeneration
+  is reproducible (full rerun -> SHA-256-identical, 581 files).
+- [x] `docs/11-data-formats.md` completed with verified reader mappings.
 
 ## M2 — Core loop
 

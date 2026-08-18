@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDump } from '../../tools/lib/dump-parse.mjs';
+import { parseDefineKinds, parseDump } from '../../tools/lib/dump-parse.mjs';
 
 // Minimal dumpSWF-shaped fixture: two sprites, one with labeled frames and
 // a nested sprite child, one with a single unlabeled frame.
@@ -51,5 +51,17 @@ describe('parseDump', () => {
       { label: 'idle' },
       { label: 'grey' },
     ]);
+  });
+
+  it('parseDefineKinds maps chid to tag kind', () => {
+    const kinds = parseDefineKinds(
+      [
+        '000001bf:    6. DefineSprite (chid: 2)    tagId= 39 len=      17',
+        '0000139c:   28. DefineBitsLossless2 (chid: 2919) tagId= 36 len= 1234',
+        '00002c50:  254. ShowFrame               tagId=  1 len=       0',
+      ].join('\n'),
+    );
+    expect(kinds.get(2)).toBe('Sprite');
+    expect(kinds.get(2919)).toBe('BitsLossless2');
   });
 });

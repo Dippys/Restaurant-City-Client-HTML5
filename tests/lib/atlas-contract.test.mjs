@@ -11,8 +11,8 @@ import { describe, expect, it } from 'vitest';
  */
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const GEN = path.resolve(HERE, '..', '..', 'public', 'assets', 'generated');
+const PUBLIC = path.resolve(GEN, '..', '..');
 const atlasJson = path.join(GEN, 'atlases', 'ingredient_asset.json');
-const atlasPng = path.join(GEN, 'atlases', 'ingredient_asset.png');
 const manifestJson = path.join(GEN, 'manifest.json');
 const present = fs.existsSync(atlasJson);
 
@@ -21,53 +21,69 @@ describe.skipIf(!present)('generated atlas contract', () => {
 
   it('uses the Phaser multi-atlas shape (textures array)', () => {
     expect(Array.isArray(atlas.textures)).toBe(true);
-    expect(atlas.textures).toHaveLength(1);
+    expect(atlas.textures.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('image is site-root-relative and resolves under public/', () => {
+  it('every texture image is site-root-relative and resolves under public/', () => {
     // Phaser multiatlas resolves textures[].image against loader.path
-    // (empty), NOT against the JSON directory — the path must be
+    // (empty), NOT against the JSON directory — paths must be
     // self-contained relative to public/ (see docs/04-asset-pipeline.md).
-    const image = atlas.textures[0].image;
-    expect(image).toBe('assets/generated/atlases/ingredient_asset.png');
-    expect(
-      fs.existsSync(path.resolve(GEN, '..', '..', image)),
-      `public/${image} must exist`,
-    ).toBe(true);
+    for (const t of atlas.textures) {
+      expect(t.image).toMatch(/^assets\/generated\/atlases\/ingredient_asset_\d+\.png$/);
+      expect(fs.existsSync(path.join(PUBLIC, t.image)), `public/${t.image} must exist`).toBe(
+        true,
+      );
+    }
   });
 
-  it('declares image size matching the PNG file', () => {
-    const buf = fs.readFileSync(atlasPng);
-    expect(buf.readUInt32BE(0)).toBe(0x89504e47);
-    expect(atlas.textures[0].size).toEqual({
-      w: buf.readUInt32BE(16),
-      h: buf.readUInt32BE(20),
-    });
+  it('declares image sizes matching the PNG files', () => {
+    for (const t of atlas.textures) {
+      const buf = fs.readFileSync(path.join(PUBLIC, t.image));
+      expect(buf.readUInt32BE(0)).toBe(0x89504e47);
+      expect(t.size).toEqual({
+        w: buf.readUInt32BE(16),
+        h: buf.readUInt32BE(20),
+      });
+    }
   });
 
   it('has a frame entry for every frame with rect data', () => {
-    const frames = atlas.textures[0].frames;
+    const frames = atlas.textures.flatMap((t) => t.frames);
     expect(frames.length).toBeGreaterThan(0);
     for (const f of frames) {
       expect(typeof f.filename).toBe('string');
-      expect(f.frame).toMatchObject({ x: expect.any(Number), y: expect.any(Number), w: expect.any(Number), h: expect.any(Number) });
+      expect(f.frame).toMatchObject({
+        x: expect.any(Number),
+        y: expect.any(Number),
+        w: expect.any(Number),
+        h: expect.any(Number),
+      });
     }
   });
 
   it('contains at least one idle/grey two-frame symbol (M0 acceptance)', () => {
-    const names = new Set(atlas.textures[0].frames.map((f) => f.filename));
+    const names = new Set(atlas.textures.flatMap((t) => t.frames.map((f) => f.filename)));
     const pair = [...names].find(
       (k) => k.endsWith('/idle') && names.has(`${k.slice(0, -5)}/grey`),
     );
     expect(pair, 'expected a symbol with idle and grey frames').toBeTruthy();
   });
 
-  it('manifest coverage is 100%', () => {
+  it('manifest coverage is 100% for every atlas SWF', () => {
     const manifest = JSON.parse(fs.readFileSync(manifestJson, 'utf8'));
-    expect(manifest.coverage.ingredient_asset.pct).toBe(100);
-    expect(manifest.coverage.ingredient_asset.exported).toBe(
-      manifest.coverage.ingredient_asset.symbols,
-    );
+    expect(Object.keys(manifest.coverage).length).toBeGreaterThan(0);
+    for (const [name, c] of Object.entries(manifest.coverage)) {
+      expect(c.pct, `${name} coverage`).toBe(100);
+      expect(c.exported, `${name} exported`).toBe(c.symbols);
+    }
+  });
+
+  it('manifest registers data, langs, and audio with existing files', () => {
+    const manifest = JSON.parse(fs.readFileSync(manifestJson, 'utf8'));
+    for (const entry of [...manifest.data, ...manifest.langs, ...manifest.audio]) {
+      // data/audio/lang `file` paths are relative to assets/generated/.
+      expect(fs.existsSync(path.join(GEN, entry.file)), `${entry.file} must exist`).toBe(true);
+    }
   });
 });
 

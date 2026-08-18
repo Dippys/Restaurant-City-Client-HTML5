@@ -22,23 +22,28 @@ if (!swfName || !outDir || keys.length === 0) {
   process.exit(1);
 }
 
-const json = JSON.parse(
-  fs.readFileSync(path.join(GEN_DIR, `${swfName}.json`), 'utf8'),
-);
-const atlasPng = PNG.sync.read(fs.readFileSync(path.join(GEN_DIR, `${swfName}.png`)));
-const framesByKey = new Map(
-  json.textures.flatMap((t) => t.frames.map((f) => [f.filename, f.frame])),
-);
+const json = JSON.parse(fs.readFileSync(path.join(GEN_DIR, `${swfName}.json`), 'utf8'));
+
+// frame key -> { rect, imageFile }
+const framesByKey = new Map();
+for (const t of json.textures) {
+  const imageFile = path.join(GEN_DIR, t.image.split('/').pop());
+  const atlasPng = PNG.sync.read(fs.readFileSync(imageFile));
+  for (const f of t.frames) {
+    framesByKey.set(f.filename, { rect: f.frame, atlasPng });
+  }
+}
 
 fs.mkdirSync(outDir, { recursive: true });
 let written = 0;
 for (const key of keys) {
-  const rect = framesByKey.get(key);
-  if (!rect) {
+  const entry = framesByKey.get(key);
+  if (!entry) {
     console.error(`frame not in atlas: ${key}`);
     process.exitCode = 1;
     continue;
   }
+  const { rect, atlasPng } = entry;
   const out = new PNG({ width: rect.w, height: rect.h });
   PNG.bitblt(atlasPng, out, rect.x, rect.y, rect.w, rect.h, 0, 0);
   const safe = key.replace(/[^a-z0-9_\-]+/gi, '_');

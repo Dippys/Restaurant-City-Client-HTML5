@@ -12,3 +12,5 @@ decision by adding a new ADR that supersedes this one.
 | [0005](0005-data-files-client-side-readers-json-runtime.md) | Data files: ported readers at tool time, JSON at runtime |
 | [0006](0006-parity-verification-methodology.md) | Parity verification: AS3-as-spec + side-by-side |
 | [0007](0007-canvas-ui-with-dom-overlay-exceptions.md) | Canvas-first UI with narrow DOM overlay exceptions |
+| [0008](0008-data-readers-live-in-tools.md) | Data readers live in tools/lib/data (supersedes ADR-0005 placement) |
+| [0009](0009-audio-mp3-passthrough.md) | Audio: mp3 passthrough of original embedded assets |

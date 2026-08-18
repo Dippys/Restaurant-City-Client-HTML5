@@ -15,6 +15,7 @@
     "pipeline:verify": "node tools/verify-pipeline.mjs"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.11.0",
     "phaser": "^3.90.0"
   },
   "devDependencies": {
