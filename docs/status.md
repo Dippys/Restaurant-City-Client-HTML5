@@ -16,8 +16,6 @@ Living tracker. **Update this file at the end of every working session**
 | M0 | Scaffold & pipeline proof | **done** | `tests/golden/m0/README.md` |
 | M1 | Asset pipeline complete | **done** | `tests/golden/m1/README.md` |
 | M2 | Core loop | **done** | `tests/golden/m2/README.md` + screens |
-| M1 | Asset pipeline complete | not started | — |
-| M2 | Core loop | not started | — |
 | M3 | Restaurant gameplay | not started | — |
 | M4 | Menus & progression | not started | — |
 | M5 | Social & meta | not started | — |
