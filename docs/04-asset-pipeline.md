@@ -30,14 +30,43 @@ them.
 
 ## Target formats
 
-- **Sprites:** WebP (fallback PNG) atlases + Phaser multi-atlas JSON
-  (`textures` + `frames`), one atlas per source SWF per scale tier. Power of
-  two where practical; max 4096px.
+- **Sprites:** PNG atlases + Phaser multi-atlas JSON for M0 (lossless PNG
+  tier of ADR-0004; WebP tier is a later pipeline upgrade), one atlas per
+  source SWF per scale tier. Power of two where practical; max 4096px.
 - **Audio:** ogg/webm + mp3 dual-format with a per-track manifest
   (Web Audio via Phaser). Export from `sound_asset.swf`'s embedded MP3s.
 - **Data:** typed JSON generated from the `bin-xml` files by the readers in
   `src/net/data/` (see doc 11). The client consumes the JSON at runtime.
 - **Strings:** lang JSON per locale from `lang_en[1].bin` / `lang_fr[1].bin`.
+
+## Implemented tooling (M0, verified against `ingredient_asset.swf`)
+
+| Script | What it does | FFDec invocation used |
+|---|---|---|
+| `tools/extract-symbols.mjs` | Parse tag tree + linkage, export sprite frames, write `extract.json` | `-dumpSWF`, `-export symbolClass`, `-format sprite:png -export sprite` |
+| `tools/build-atlases.mjs` | Shelf-pack frames, compose PNG atlas + multi-atlas JSON (pngjs, no native deps) | — |
+| `tools/build-manifest.mjs` | Emit `manifest.json` + coverage report | — |
+| `tools/verify-pipeline.mjs` | Re-extract from the original SWF, compare sets, fail on <100% | `-dumpSWF`, `-export symbolClass`, `-format sprite:png -export sprite` |
+| `tools/pipeline.mjs` | Runs all stages in order | — |
+| `tools/build-audio.mjs` | (M1) demux `sound_asset.swf` MP3s | `-export sound` |
+
+Verified facts about the extraction (recorded so M1 reuses them):
+
+- FFDec `-export sprite` emits one folder per sprite named
+  `DefineSprite_<chid>[_<ExportName>_<ClassName>]` containing one PNG per
+  timeline frame (`1.png`, `2.png`, ...). Frame content is the rendered
+  composite (children included).
+- Frame labels come from parsing `-dumpSWF` (indented tag tree:
+  `FrameLabel`/`ShowFrame` per sprite). `ingredient_asset` frames are
+  `idle`/`grey`; unlabeled frames use zero-padded indexes.
+- The linkage tables (`-export symbolClass` CSV) contain both the
+  ExportAssets and SymbolClass entries; the pipeline dedupes by chid and
+  excludes chid 0 (main-timeline root marker).
+- `ingredient_asset.swf`: 92 linked sprites, 161 frames total, 65 unnamed
+  inner wrapper sprites (composited into their parents, not linked —
+  excluded), 100% coverage achieved.
+- Pipeline output is reproducible: two consecutive runs produce
+  byte-identical artifacts (verified by SHA-256 comparison).
 
 ## Pipeline stages
 
@@ -65,7 +94,9 @@ them.
                "mp3": "audio/music_main.mp3" } ],
   "data": [ { "id": "ingredients", "file": "data/ingredients.json",
               "source": "ingredient[1].bin" } ],
-  "langs": [ { "code": "en", "file": "data/lang_en.json" } ]
+  "langs": [ { "code": "en", "file": "data/lang_en.json" } ],
+  "coverage": { "ingredient_asset": { "symbols": 92, "exported": 92,
+                  "frames": 161, "pct": 100 } }
 }
 ```
 

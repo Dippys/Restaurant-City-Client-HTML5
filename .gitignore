@@ -5,6 +5,9 @@ dist/
 # Generated runtime assets (built by tools/ from the original SWFs — see docs/04-asset-pipeline.md)
 public/assets/generated/
 
+# Pipeline scratch work
+tools/.work/
+
 # Local test artifacts
 tests/golden/.tmp/
 *.log

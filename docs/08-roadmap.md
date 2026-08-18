@@ -16,11 +16,12 @@ criteria are demonstrated with evidence (see `07-testing-and-qa.md`) and
 
 ## M0 — Scaffold & pipeline proof
 
-- [ ] `npm install`, `npm run dev`, `npm run check`, `npm test` all work.
-- [ ] Dev proxy: client can fetch `/bin-xml/ingredient.bin` through `:5173`.
-- [ ] `tools/extract-symbols.mjs` + `tools/build-atlases.mjs` convert
-  `ingredient_asset.swf` (12 symbols+ coverage, report green).
-- [ ] Boot scene renders one exported animated sprite.
+- [x] `npm install`, `npm run dev`, `npm run check`, `npm test` all work.
+- [x] Dev proxy: client can fetch `/bin-xml/ingredient.bin` through `:5173`.
+- [x] `tools/extract-symbols.mjs` + `tools/build-atlases.mjs` convert
+  `ingredient_asset.swf` (92 symbols, 100% coverage, report green).
+- [x] Boot scene renders one exported animated sprite (idle<->grey
+  timeline; see `tests/golden/m0/README.md`).
 - [x] `git init` + first commit; `docs/status.md` template filled.
 
 ## M1 — Asset pipeline complete
