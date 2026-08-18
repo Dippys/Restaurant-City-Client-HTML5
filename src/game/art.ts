@@ -26,14 +26,23 @@ export function symbolFrames(frameNames: readonly string[], atlasKey: string, cl
 }
 
 /**
- * Picks the display frame for a symbol: the labeled `idle` frame when it
- * exists, otherwise the first frame. (Original timelines default to the
- * first frame unless code plays a label.)
+ * Picks the display frame for a symbol:
+ * - rotation r uses frame r+1 when the symbol has that many frames (the
+ *   AS3 advances the clip on rotate — RoomItem.rotate content.nextFrame);
+ * - otherwise the labeled `idle` frame, then the first frame.
  */
-export function pickDisplayFrame(frameNames: readonly string[], art: ArtRef): string | null {
+export function pickDisplayFrame(
+  frameNames: readonly string[],
+  art: ArtRef,
+  rotation = 0,
+): string | null {
   const frames = symbolFrames(frameNames, art.atlasKey, art.className);
   if (frames.length === 0) {
     return null;
+  }
+  const rotated = rotation > 0 ? frames[rotation] : undefined;
+  if (rotated) {
+    return rotated;
   }
   return frames.find((f) => f.endsWith('/idle')) ?? frames[0] ?? null;
 }

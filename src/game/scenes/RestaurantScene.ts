@@ -3,6 +3,7 @@ import { GameState, roomSizeAtLevel } from '../../core/state/game-state';
 import { itemDrawPriority } from '../../core/iso/priorities';
 import {
   FLOOR_COLOUR,
+  FLOOR_DRAW_PRIORITY,
   ROOM_ORIGIN_X,
   ROOM_ORIGIN_Y,
   SCORE_POPUP_PRIORITY,
@@ -35,6 +36,15 @@ const SHOP_GROUPS = [
   'Wall Decoration',
   'Door',
 ];
+
+// Default walls (WorldRestaurant.addDefaultWalls L979-1021): real items
+// added at runtime, rotated once, non-editable.
+const WALL_ID = 3090000; // "White Walls" -> Wall2
+const WALL_CORNER_ID = 3090001; // "Wall Corner" -> WallCorner
+const WALL_ROTATION = 1;
+// Base fills sit below the FLOOR_DRAW_PRIORITY tile layer (rooms' tile art).
+const BASE_FLOOR_DEPTH = -2000000;
+const OUTSIDE_BASE_COLOUR = 10668375; // fillBaseArea for the outside area
 
 type RenderOwned = PlacedItem & { owned: OwnedItem };
 
@@ -89,46 +99,61 @@ export class RestaurantScene extends Phaser.Scene {
     this.setZoom(this.zoomLevel);
 
     this.rebuildRoom();
+    this.roomMap.computeStackHeights();
     this.renderFloor();
     this.renderItems();
+    this.roomContainer.sort('depth'); // painter's order by explicit depth
     this.drawChrome();
     this.setupCamera();
   }
 
   // ---------------------------------------------------------------- world
 
+  /** Floor: base diamond fills + per-tile art from the save's floor map. */
   private renderFloor(): void {
     const { numTilesX, numTilesY } = this.roomMap.size;
-    const g = this.add.graphics();
-    const diamond = (x: number, y: number, color: number) => {
-      const sx = getScreenX(x, y);
-      const sy = getScreenY(x, y);
-      g.fillStyle(color, 1);
-      g.beginPath();
-      g.moveTo(sx, sy - TILE_HEIGHT_HALF);
-      g.lineTo(sx + 40, sy);
-      g.lineTo(sx, sy + TILE_HEIGHT_HALF);
-      g.lineTo(sx - 40, sy);
-      g.closePath();
-      g.fillPath();
+    const base = this.add.graphics();
+    base.setDepth(BASE_FLOOR_DEPTH);
+    const diamondArea = (x0: number, y0: number, w: number, h: number, color: number) => {
+      const p = (x: number, y: number): Phaser.Geom.Point =>
+        new Phaser.Geom.Point(getScreenX(x, y), getScreenY(x, y));
+      base.fillStyle(color, 1);
+      base.fillPoints(
+        [p(x0, y0), p(x0 + w, y0), p(x0 + w, y0 + h), p(x0, y0 + h)],
+        true,
+      );
     };
-    for (let y = 0; y < numTilesY; y += 1) {
-      for (let x = 0; x < numTilesX; x += 1) {
-        diamond(x, y, FLOOR_COLOUR);
-      }
+    // Interior + outside base fills (fillBaseArea colours).
+    diamondArea(0, 0, numTilesX, numTilesY, FLOOR_COLOUR);
+    diamondArea(0, numTilesY, 7, 6, OUTSIDE_BASE_COLOUR);
+    this.roomContainer.add(base);
+
+    // Tile art from the save (paintFloorMap): every non-zero tile id is an
+    // interior item whose className draws the tile.
+    const frames = this.textures.get('indoor').getFrameNames();
+    const paintTiles = (tileIds: readonly number[], yOffset: number) => {
+      tileIds.forEach((id, idx) => {
+        if (id <= 0) return;
+        const entry = this.catalog.get(id);
+        if (!entry || entry.className === '') return;
+        const frame = pickDisplayFrame(frames, { atlasKey: 'indoor_asset', className: entry.className });
+        if (!frame) return;
+        const tileX = idx % 20;
+        const tileY = Math.floor(idx / 20) + yOffset;
+        const sprite = this.add.image(getScreenX(tileX, tileY), getScreenY(tileX, tileY), 'indoor', frame);
+        sprite.setDepth(FLOOR_DRAW_PRIORITY);
+        this.roomContainer.add(sprite);
+      });
+    };
+    const floors = this.state.profile?.floors ?? [];
+    const main = floors.find((f) => f.floorIndex === this.state.profile?.activeFloorIndex) ?? floors[0];
+    if (main) {
+      paintTiles(main.tiles, 0);
     }
-    for (let y = numTilesY; y < numTilesY + 6; y += 1) {
-      for (let x = 0; x < 7; x += 1) {
-        diamond(x, y, 0x9ccd9c);
-      }
+    const outside = floors.find((f) => f.floorIndex === 1);
+    if (outside) {
+      paintTiles(outside.tiles.slice(0, 7 * 6), numTilesY);
     }
-    for (let y = 0; y < numTilesY; y += 1) {
-      diamond(0, y, 0xb0a48f);
-    }
-    for (let x = 0; x < numTilesX; x += 1) {
-      diamond(x, 0, 0xb0a48f);
-    }
-    this.roomContainer.add(g);
   }
 
   private roomTileY(item: OwnedItem): number {
@@ -141,41 +166,64 @@ export class RestaurantScene extends Phaser.Scene {
     }
     this.sprites.clear();
 
+    let wallCount = 0;
+    let itemCount = 0;
     const frames = this.textures.get('indoor').getFrameNames();
     for (const item of this.roomMap.all()) {
       const render = item as RenderOwned;
       const entry = this.catalog.get(item.configId);
       if (!entry || entry.className === '') continue;
-      const frame = pickDisplayFrame(frames, { atlasKey: 'indoor_asset', className: entry.className });
+      const frame = pickDisplayFrame(frames, { atlasKey: 'indoor_asset', className: entry.className }, item.rotation);
       if (!frame) continue;
       const flags = entry.flags;
       const kind = flags.floorTileItem
         ? ('floor' as const)
-        : flags.wallDecorationItem
-          ? ('wall-decoration' as const)
-          : ('item' as const);
+        : flags.doorItem
+          ? ('door' as const)
+          : flags.wallDecorationItem
+            ? ('wall-decoration' as const)
+            : ('item' as const);
       const sprite = this.add.sprite(0, 0, 'indoor', frame);
+      // Anchor: clip registration at the tile anchor (diamond centre);
+      // our tight-cropped art is bottom-centred, so the sprite bottom sits
+      // at the diamond bottom vertex, stack height above the floor.
       sprite.setOrigin(0.5, 1);
-      const pos = itemScreenPosition(item.tileX, item.tileY, item.height);
+      const height = this.roomMap.stackHeightOf(item.id);
+      const pos = itemScreenPosition(item.tileX, item.tileY, height);
       sprite.setPosition(pos.x, pos.y + TILE_HEIGHT_HALF);
-      if (item.rotation % 2 === 1) {
-        sprite.setFlipX(true);
-      }
-      sprite.setDepth(itemDrawPriority(kind, { tileX: item.tileX, tileY: item.tileY, curHeight: item.height }));
+      sprite.setDepth(
+        itemDrawPriority(kind, {
+          tileX: item.tileX,
+          tileY: item.tileY,
+          rotation: item.rotation,
+          curHeight: height,
+          fullGridSizeX: this.roomMap.size.numTilesX,
+        }),
+      );
       sprite.setData('itemId', item.id);
       sprite.setData('owned', render.owned);
       sprite.setInteractive({ useHandCursor: true });
       sprite.on('pointerdown', () => {
-        if (this.editing && this.editor) {
+        // Default walls are non-editable (addDefaultWalls editable=false).
+        if (this.editing && this.editor && !item.id.startsWith('r-')) {
           this.pickUpItem(item.id);
         }
       });
       this.sprites.set(item.id, sprite);
       this.roomContainer.add(sprite);
+      if (item.configId === String(WALL_ID) || item.configId === String(WALL_CORNER_ID)) {
+        wallCount += 1;
+      } else {
+        itemCount += 1;
+      }
     }
+    // Headless-check hooks.
+    document.documentElement.dataset.walls = String(wallCount);
+    document.documentElement.dataset.items = String(itemCount);
     // Phaser containers sort children by depth; nothing else to do.
   }
 
+  /** Builds the room: default walls (addDefaultWalls) + owned items. */
   private rebuildRoom(): void {
     const size = roomSizeAtLevel(this.state.level);
     const roomMap = new RoomMap({
@@ -185,12 +233,57 @@ export class RestaurantScene extends Phaser.Scene {
       numOutsideTilesY: 6,
     });
     let idSeq = 0;
+
+    const place = (configId: number, tileX: number, tileY: number, rotation: number): void => {
+      const entry = this.catalog.get(configId);
+      const flags = entry?.flags;
+      const footprint = footprintFromConfig(entry?.config ?? {});
+      const item: RenderOwned = {
+        id: `r-${configId}-${tileX}-${tileY}-${idSeq++}`,
+        configId: String(configId),
+        tileX,
+        tileY,
+        rotation,
+        height: 0,
+        cost: Number(entry?.config.cost ?? 0),
+        cash: Number(entry?.config.cash ?? 0),
+        surface: flags?.surface ?? false,
+        stackable: flags?.stackable ?? false,
+        wallDecorationItem: flags?.wallDecorationItem ?? false,
+        wallpaperItem: flags?.wallpaperItem ?? false,
+        floorTileItem: flags?.floorTileItem ?? false,
+        outdoor: flags?.outdoor ?? false,
+        wallItem: flags?.wallItem ?? false,
+        numTilesX: footprint.numTilesX,
+        numTilesY: footprint.numTilesY,
+        owned: {
+          serverId: -idSeq,
+          globalItemId: configId,
+          positionX: tileX,
+          positionY: tileY,
+          data: rotation & 0x0f,
+          employeeId: { network: 0, networkUid: '', playfishUid: 0 },
+          roomIndex: 0,
+        },
+      };
+      roomMap.place(item);
+    };
+
+    // Default walls along the top and left edges + the corner.
+    for (let x = 1; x < size.numTilesX; x += 1) {
+      place(WALL_ID, x, 0, WALL_ROTATION);
+    }
+    for (let y = 1; y < size.numTilesY; y += 1) {
+      place(WALL_ID, 0, y, WALL_ROTATION);
+    }
+    place(WALL_CORNER_ID, 0, 0, WALL_ROTATION);
+
     for (const owned of this.state.profile?.ownedItems ?? []) {
       if (getItemType(owned.globalItemId) !== ITEM_TYPE_RESTAURANT) continue;
       const entry = this.catalog.get(owned.globalItemId);
       const flags = entry?.flags;
+      const footprint = footprintFromConfig(entry?.config ?? {});
       const item: RenderOwned = {
-        // serverId is unique per owned item; the suffix guards duplicates.
         id: `owned-${owned.serverId}-${idSeq++}`,
         configId: String(owned.globalItemId),
         tileX: owned.positionX,
@@ -206,8 +299,8 @@ export class RestaurantScene extends Phaser.Scene {
         floorTileItem: flags?.floorTileItem ?? false,
         outdoor: flags?.outdoor ?? false,
         wallItem: flags?.wallItem ?? false,
-        numTilesX: footprintFromConfig(entry?.config ?? {}).numTilesX,
-        numTilesY: footprintFromConfig(entry?.config ?? {}).numTilesY,
+        numTilesX: footprint.numTilesX,
+        numTilesY: footprint.numTilesY,
         owned,
       };
       roomMap.place(item);
@@ -326,6 +419,7 @@ export class RestaurantScene extends Phaser.Scene {
 
   private exitEditor(): void {
     this.restoreAbandonedMoves();
+    this.roomMap.computeStackHeights();
     this.renderItems();
     this.editing = false;
     this.editor = null;
@@ -477,7 +571,11 @@ export class RestaurantScene extends Phaser.Scene {
     const entry = this.catalog.get(picked.template.configId);
     if (!entry) return;
     const frames = this.textures.get('indoor').getFrameNames();
-    const frame = pickDisplayFrame(frames, { atlasKey: 'indoor_asset', className: entry.className });
+    const frame = pickDisplayFrame(
+      frames,
+      { atlasKey: 'indoor_asset', className: entry.className },
+      picked.rotation,
+    );
     if (!frame) return;
     this.cursor?.destroy();
     this.cursor = this.add.image(0, 0, 'indoor', frame);
@@ -540,6 +638,7 @@ export class RestaurantScene extends Phaser.Scene {
       this.sprites.get(placed.id)?.setVisible(true);
       this.sprites.get(placed.id)?.destroy();
       this.sprites.delete(placed.id);
+      this.roomMap.computeStackHeights();
       this.renderItems();
       this.cursor?.destroy();
       this.cursor = null;
@@ -614,6 +713,7 @@ export class RestaurantScene extends Phaser.Scene {
 
       this.exitEditor();
       this.rebuildRoom();
+      this.roomMap.computeStackHeights();
       this.renderItems();
       this.setStatus(`saved (version ${this.state.saveVersion}) and reloaded`, '#7ddb8a');
     } catch (err) {

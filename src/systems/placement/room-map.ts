@@ -7,7 +7,7 @@
  */
 import { MAX_NUM_TILES_X, getTileIndex } from '../../core/iso/math';
 import { defaultWallAt, type PlacementContext, type TileStack } from '../../core/items/validity';
-import type { Footprint } from '../../core/items/footprint';
+import { itemVisualHeight, coveredTiles, type Footprint } from '../../core/items/footprint';
 
 export interface PlacedItem extends Footprint {
   readonly id: string;
@@ -38,8 +38,40 @@ export interface RoomSize {
 export class RoomMap {
   private readonly items = new Map<string, PlacedItem>();
   private readonly tiles = new Map<number, PlacedItem[]>();
+  private readonly stackHeights = new Map<string, number>();
 
   constructor(public readonly size: RoomSize) {}
+
+  /** Stack height (px) of an item: the top of the stack underneath it. */
+  stackHeightOf(id: string): number {
+    return this.stackHeights.get(id) ?? 0;
+  }
+
+  /**
+   * Computes painter's-order stack heights (port of
+   * getItemHeightAtTile/getTileTopHeight): for each item in row/column
+   * order, its height = the tallest covered tile's top height, then the
+   * item's own top height is pushed onto its tiles.
+   */
+  computeStackHeights(): void {
+    const tileTop = new Map<number, number>();
+    const sorted = [...this.items.values()].sort(
+      (a, b) => a.tileY - b.tileY || a.tileX - b.tileX || a.configId.localeCompare(b.configId),
+    );
+    this.stackHeights.clear();
+    for (const item of sorted) {
+      let top = 0;
+      for (const t of coveredTiles(item, item.tileX, item.tileY)) {
+        top = Math.max(top, tileTop.get(this.tileKey(t.x, t.y)) ?? 0);
+      }
+      this.stackHeights.set(item.id, top);
+      const bottom = top + itemVisualHeight(item);
+      for (const t of coveredTiles(item, item.tileX, item.tileY)) {
+        const key = this.tileKey(t.x, t.y);
+        tileTop.set(key, Math.max(tileTop.get(key) ?? 0, bottom));
+      }
+    }
+  }
 
   private tileKey(x: number, y: number): number {
     return getTileIndex(x, y);

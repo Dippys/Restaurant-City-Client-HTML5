@@ -18,6 +18,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BASE = 'http://localhost:5173';
 const OUT = path.resolve(HERE, '..', 'tests', 'golden', 'm2', 'screens');
 const FLOOR_COLOUR = 15132390;
+const OUTSIDE_COLOUR = 10668375;
 
 function rgb(color) {
   return [(color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff];
@@ -100,9 +101,15 @@ try {
     200,
     560,
     240,
-    [rgb(FLOOR_COLOUR), rgb(0x9ccd9c)],
+    [rgb(FLOOR_COLOUR), rgb(OUTSIDE_COLOUR)],
   );
   check('restaurant floor rendered', found !== null, found ? `floor pixel rgb(${found.join(',')})` : 'no floor pixel found');
+
+  // 4b. Default walls + owned items must be present (8x8 room: 7+7+1 walls).
+  const walls = Number(await page.evaluate(() => document.documentElement.dataset.walls ?? '0'));
+  const items = Number(await page.evaluate(() => document.documentElement.dataset.items ?? '0'));
+  check('default walls rendered', walls === 15, `walls=${walls}`);
+  check('owned items rendered', items > 0, `items=${items}`);
 
   // 5. Editor: click "edit" (bottom-right, inside the text bounds).
   await page.mouse.click(686, 568);
