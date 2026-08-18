@@ -180,6 +180,11 @@ export class RpcWriter {
     this.chunks.push(value);
   }
 
+  /** Raw bytes with NO length prefix (used by audit payloads). */
+  writeRaw(value: Uint8Array): void {
+    this.chunks.push(value);
+  }
+
   writeDate(epochSeconds: number): void {
     this.writeVarint(epochSeconds);
   }
