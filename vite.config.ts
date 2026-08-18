@@ -20,6 +20,11 @@ export default defineConfig({
       '/g/fbfeed': { target: 'http://localhost:8090', changeOrigin: false },
       // Raw game data files (ingredient.bin, recipe.bin, lang_en.bin, ...)
       '/bin-xml': { target: 'http://localhost:8090', changeOrigin: false },
+      // Backend account pages + session API (login flow for the client)
+      '/login': { target: 'http://localhost:8090', changeOrigin: false },
+      '/signup': { target: 'http://localhost:8090', changeOrigin: false },
+      '/account': { target: 'http://localhost:8090', changeOrigin: false },
+      '/__api': { target: 'http://localhost:8090', changeOrigin: false },
     },
   },
   build: {

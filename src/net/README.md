@@ -12,10 +12,16 @@ Rules (see `docs/05-network-protocol.md`):
   (msgType 255), and per-call response readers — see the protocol doc.
 - No framework imports; unit-testable in Node.
 
-Planned contents (M0+):
+Implemented (M2):
 
-- `codec.ts` — primitive reader/writer port
-- `rpc-client.ts` — session, batch, per-call request/response mapping
+- `codec.ts` — `RpcReader`/`RpcWriter` primitive port (Uint8Array,
+  Buffer-free; EOF-strict; 4-byte UTF-8 rejected like the server)
+- `calls.ts` — msgType -> call-name table (mirrors the backend)
+- `rpc-client.ts` — fetch-based client: single/batch envelopes, session,
+  handshake (getServerTime + init), 401 -> `RpcError` for the login flow
+
+Planned (M2+):
+
 - `calls/` — one module per msgType (profile, friends, mails, saveProfile...)
 - `data/` — typed runtime models for the generated data JSON
   (`public/assets/generated/data/*.json`). The bin-xml READERS live in
