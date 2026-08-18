@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { RpcClient } from '../../net/rpc-client';
+import { fetchSession } from '../../net/session';
 
 interface CoverageEntry {
   symbols: number;
@@ -71,6 +73,7 @@ export class BootScene extends Phaser.Scene {
 
     this.probeProxy();
     this.showManifestStats();
+    this.probeSession();
     this.showLoadErrors();
     try {
       this.showSprites();
@@ -201,6 +204,47 @@ export class BootScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
     }
+  }
+
+  /** M2 proof: session state + RPC handshake against the local backend. */
+  private probeSession(): void {
+    const style = { fontFamily: 'monospace', fontSize: '12px', color: '#c8c8c8' };
+    void fetchSession()
+      .then(async (session) => {
+        if (!session.loggedIn) {
+          const link = this.add
+            .text(CENTER, 220, 'not logged in — click here to log in', {
+              ...style,
+              color: '#ffb74d',
+              backgroundColor: '#00000000',
+            })
+            .setOrigin(0.5)
+            .setInteractive({ useHandCursor: true });
+          link.on('pointerdown', () => {
+            window.location.assign('/login?next=/');
+          });
+          return;
+        }
+        const client = new RpcClient();
+        const serverTime = await client.handshake();
+        this.add
+          .text(
+            CENTER,
+            220,
+            `session OK: ${session.account?.username ?? '?'} — handshake done, server time ${serverTime}`,
+            { ...style, color: '#7ddb8a' },
+          )
+          .setOrigin(0.5);
+      })
+      .catch((err: unknown) => {
+        this.add
+          .text(CENTER, 220, `session FAILED: ${err instanceof Error ? err.message : String(err)}`, {
+            ...style,
+            color: '#ff8a80',
+            wordWrap: { width: 700 },
+          })
+          .setOrigin(0.5);
+      });
   }
 
   /** Prints loader failures on screen so a half-loaded scene explains itself. */
