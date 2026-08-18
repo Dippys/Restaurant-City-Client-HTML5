@@ -200,7 +200,10 @@ export class RestaurantScene extends Phaser.Scene {
           tileY: item.tileY,
           rotation: item.rotation,
           curHeight: height,
-          fullGridSizeX: this.roomMap.size.numTilesX,
+          // Wall decorations anchor against THEIR OWN footprint width
+          // (RoomItem.fullGridSizeX), not the room size — using the room
+          // width pushed left-wall windows under the walls.
+          fullGridSizeX: item.numTilesX,
         }),
       );
       sprite.setData('itemId', item.id);
