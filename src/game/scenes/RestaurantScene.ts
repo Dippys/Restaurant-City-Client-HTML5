@@ -38,10 +38,15 @@ const SHOP_GROUPS = [
 ];
 
 // Default walls (WorldRestaurant.addDefaultWalls L979-1021): real items
-// added at runtime, rotated once, non-editable.
+// added at runtime, non-editable. The decompiled source rotates both edges
+// once; the Wall2 clip's two frames are exact horizontal mirrors (verified
+// pixel-wise), so each edge gets its natural orientation: the top wall uses
+// frame 1, the left wall its mirror (frame 2), the corner is directionless.
+// (Deviation from rotate-once flagged for parity review vs the original.)
 const WALL_ID = 3090000; // "White Walls" -> Wall2
 const WALL_CORNER_ID = 3090001; // "Wall Corner" -> WallCorner
-const WALL_ROTATION = 1;
+const WALL_ROTATION_TOP = 0;
+const WALL_ROTATION_LEFT = 1;
 // Base fills sit below the FLOOR_DRAW_PRIORITY tile layer (rooms' tile art).
 const BASE_FLOOR_DEPTH = -2000000;
 const OUTSIDE_BASE_COLOUR = 10668375; // fillBaseArea for the outside area
@@ -271,12 +276,12 @@ export class RestaurantScene extends Phaser.Scene {
 
     // Default walls along the top and left edges + the corner.
     for (let x = 1; x < size.numTilesX; x += 1) {
-      place(WALL_ID, x, 0, WALL_ROTATION);
+      place(WALL_ID, x, 0, WALL_ROTATION_TOP);
     }
     for (let y = 1; y < size.numTilesY; y += 1) {
-      place(WALL_ID, 0, y, WALL_ROTATION);
+      place(WALL_ID, 0, y, WALL_ROTATION_LEFT);
     }
-    place(WALL_CORNER_ID, 0, 0, WALL_ROTATION);
+    place(WALL_CORNER_ID, 0, 0, WALL_ROTATION_LEFT);
 
     for (const owned of this.state.profile?.ownedItems ?? []) {
       if (getItemType(owned.globalItemId) !== ITEM_TYPE_RESTAURANT) continue;

@@ -82,6 +82,12 @@ try {
   await page.screenshot({ path: path.join(OUT, '1-street.png') });
   const streetStatus = await page.evaluate(() => document.documentElement.dataset.status ?? '');
   check('street reached', !streetStatus.includes('FAILED'), streetStatus);
+  // Own building layout: roof above the body origin, scaled to body width.
+  const roofY = Number(await page.evaluate(() => document.documentElement.dataset.roofY ?? '0'));
+  const bodyH = Number(await page.evaluate(() => document.documentElement.dataset.bodyH ?? '0'));
+  const roofScaled = await page.evaluate(() => document.documentElement.dataset.roofScaled === '1');
+  check('roof above body', roofY < 0, `roofY=${roofY} bodyH=${bodyH}`);
+  check('roof scaled to body', roofScaled, 'scale != 1');
 
   // 3. Click the own building (first real slot at world x=420, camera x=40,
   //    building base at y=520).

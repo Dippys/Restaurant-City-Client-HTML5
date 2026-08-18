@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GameState } from '../../core/state/game-state';
 import { BUILDING_GAP, PORTRAIT_Y, streetSlots } from '../../core/street/layout';
-import { ITEM_TYPE_BUILDING, getItemType, rotationFromData } from '../../core/items/types';
+import { ITEM_TYPE_BUILDING, getItemType } from '../../core/items/types';
 import { pickDisplayFrame } from '../art';
 import { ItemCatalog } from '../catalog';
 import type { OwnedItem, ProfileInfo } from '../../net/profile';
@@ -110,6 +110,7 @@ export class StreetScene extends Phaser.Scene {
         const db = this.catalog.get(b.globalItemId)?.groupDrawPriority ?? 0;
         return da - db;
       });
+      const sprites: Array<{ owned: OwnedItem; sprite: Phaser.GameObjects.Sprite; groupName: string }> = [];
       for (const item of items) {
         const entry = this.catalog.get(item.globalItemId);
         if (!entry || entry.className === '') {
@@ -119,18 +120,51 @@ export class StreetScene extends Phaser.Scene {
         if (!frame) {
           continue;
         }
-        const sprite = this.add.sprite(
-          Math.max(-200, Math.min(200, item.positionX)),
-          Math.max(-240, Math.min(0, item.positionY)),
-          'outdoor',
-          frame,
-        );
+        const sprite = this.add.sprite(0, 0, 'outdoor', frame);
+        sprite.setOrigin(0.5, 1);
         sprite.setDepth(entry.groupDrawPriority);
-        if (rotationFromData(item.data) % 2 === 1) {
-          sprite.setFlipX(true);
-        }
-        group.add(sprite);
+        sprites.push({ owned: item, sprite, groupName: entry.groupName });
       }
+
+      // Layout (StreetBuilding.addItem/positionRoof):
+      // - body (group "Body") is anchored at the building origin (0,0).
+      // - roof (group "Roof") sits at the body's top edge, scaled to the
+      //   body's width.
+      // - everything else uses its saved x/y clamped to x∈[-200,200],
+      //   y∈[-240,0]; `flipped` items (data == 1) mirror horizontally.
+      const body = sprites.find((s) => s.groupName === 'Body') ?? sprites[0];
+      let bodyTop = 0;
+      if (body) {
+        body.sprite.setPosition(0, 0);
+        bodyTop = body.sprite.displayHeight;
+        group.add(body.sprite);
+      }
+      let roofY = 0;
+      let roofScaled = false;
+      for (const s of sprites) {
+        if (s === body) continue;
+        if (s.groupName === 'Roof') {
+          s.sprite.setPosition(0, -bodyTop);
+          roofY = -bodyTop;
+          if (body && body.sprite.displayWidth > 0 && s.sprite.displayWidth > 0) {
+            const scale = body.sprite.displayWidth / s.sprite.displayWidth;
+            s.sprite.setScale(scale);
+            roofScaled = Math.abs(scale - 1) > 0.01;
+          }
+        } else {
+          const x = Math.max(-200, Math.min(200, s.owned.positionX));
+          const y = Math.max(-240, Math.min(0, s.owned.positionY));
+          s.sprite.setPosition(x, y);
+          if (s.owned.data === 1) {
+            s.sprite.setFlipX(true);
+          }
+        }
+        group.add(s.sprite);
+      }
+      // Headless-check hooks: the roof must sit above the body origin.
+      document.documentElement.dataset.roofY = String(roofY);
+      document.documentElement.dataset.bodyH = String(bodyTop);
+      document.documentElement.dataset.roofScaled = roofScaled ? '1' : '0';
       // Transparent click target (child hit-testing is reliable; container
       // hitArea hit-testing proved flaky in Phaser 3.90).
       const clickTarget = this.add
