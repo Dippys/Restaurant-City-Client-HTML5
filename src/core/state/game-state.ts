@@ -78,6 +78,35 @@ export class GameState {
     return roomSizeAtLevel(this.level);
   }
 
+  /** Coins = the profile `credits` field (audit creditsDelta changes it). */
+  get coins(): number {
+    return this.coinsOverride ?? this.profile?.credits ?? 0;
+  }
+
+  /** Local coin mutation; persists through the next saveProfile audit. */
+  spendCoins(amount: number): boolean {
+    if (this.coins < amount) {
+      return false;
+    }
+    this.coinsOverride = this.coins - amount;
+    return true;
+  }
+
+  addCoins(amount: number): void {
+    this.coinsOverride = this.coins + amount;
+  }
+
+  /** Coin delta accumulated locally since the last save (audit creditsDelta). */
+  coinDelta(): number {
+    return (this.coinsOverride ?? this.coins) - (this.profile?.credits ?? 0);
+  }
+
+  clearCoinOverride(): void {
+    this.coinsOverride = null;
+  }
+
+  private coinsOverride: number | null = null;
+
   applyProfile(profile: ProfileInfo): void {
     this.profile = profile;
   }

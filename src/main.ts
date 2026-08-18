@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import { BootScene } from './game/scenes/BootScene';
+import { ProofScene } from './game/scenes/ProofScene';
+import { RestaurantScene } from './game/scenes/RestaurantScene';
+import { StreetScene } from './game/scenes/StreetScene';
 
 /**
  * Application entrypoint.
@@ -18,7 +21,7 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene],
+  scene: [BootScene, ProofScene, StreetScene, RestaurantScene],
 });
 
 export default game;

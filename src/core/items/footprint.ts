@@ -15,9 +15,9 @@ export interface Footprint {
   readonly numTilesY: number;
 }
 
-export function footprintFromConfig(config: { sizeX?: string | number; sizeY?: string | number }): Footprint {
-  const sx = config.sizeX !== undefined ? Number(config.sizeX) : NaN;
-  const sy = config.sizeY !== undefined ? Number(config.sizeY) : NaN;
+export function footprintFromConfig(config: Record<string, unknown> | null | undefined): Footprint {
+  const sx = config && config.sizeX !== undefined && config.sizeX !== null ? Number(config.sizeX) : NaN;
+  const sy = config && config.sizeY !== undefined && config.sizeY !== null ? Number(config.sizeY) : NaN;
   return {
     numTilesX: Number.isFinite(sx) && sx >= 1 ? Math.round(sx) : 1,
     numTilesY: Number.isFinite(sy) && sy >= 1 ? Math.round(sy) : 1,

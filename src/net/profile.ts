@@ -148,6 +148,30 @@ export function readPlot(r: RpcReader): Plot {
   return { plotId, ingredientId, plantWetTime, timeToDry };
 }
 
+export interface Mail {
+  readonly id: number;
+  readonly sender: NetworkUid;
+  readonly itemIds: number[];
+  readonly message: string;
+  readonly read: boolean;
+  readonly sendDate: number;
+  readonly deleteTime: number;
+  readonly type: number;
+}
+
+/** RpcResponse.readMail / server writeMail (spec §5.5). */
+export function readMail(r: RpcReader): Mail {
+  const id = r.readVarint();
+  const sender = r.readNetworkUid();
+  const itemIds = r.readArray((rr) => rr.readVarint());
+  const message = r.readString();
+  const read = r.readBool();
+  const sendDate = r.readDate();
+  const deleteTime = r.readU8();
+  const type = r.readU8();
+  return { id, sender, itemIds, message, read, sendDate, deleteTime, type };
+}
+
 export function readIngredientMarketItem(r: RpcReader): IngredientMarketItem {
   const ingredientId = r.readVarint();
   const price = r.readVarint();
