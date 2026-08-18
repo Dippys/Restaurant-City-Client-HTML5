@@ -12,13 +12,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "pipeline": "node tools/pipeline.mjs",
-    "pipeline:verify": "node tools/verify-pipeline.mjs"
+    "pipeline:verify": "node tools/verify-pipeline.mjs",
+    "check:visual": "node tools/visual-check.mjs"
   },
   "dependencies": {
     "fast-xml-parser": "^5.11.0",
     "phaser": "^3.90.0"
   },
   "devDependencies": {
+    "playwright": "^1.62.1",
     "pngjs": "^7.0.0",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",

@@ -39,14 +39,16 @@ criteria are demonstrated with evidence (see `07-testing-and-qa.md`) and
 
 ## M2 — Core loop
 
-- [ ] Handshake + main batch RPC working against `:8090` (replay tests).
-- [ ] `GameState` populated from `getUserProfile` (all fields).
-- [ ] Street view renders from a saved profile; restaurant renders interior
+- [x] Handshake + main batch RPC working against `:8090` (replay tests
+  against captured traffic + live e2e + headless visual check).
+- [x] `GameState` populated from `getUserProfile` (all fields).
+- [x] Street view renders from a saved profile; restaurant renders interior
   + exterior from placements, correct depth order.
-- [ ] Camera: pan and zoom lever.
-- [ ] Editor: buy item from shop, place on valid tiles, move, sell;
-  audit-delimited save persists via `saveProfile` and survives reload.
-- [ ] Login screen and session handling (reuse backend cookie flow).
+- [x] Camera: pan and zoom lever.
+- [x] Editor: buy item from shop, place on valid tiles, move, sell;
+  audit-delimited save persists via `saveProfile` and survives reload
+  (e2e move round-trip on the live backend).
+- [x] Login screen and session handling (reuse backend cookie flow).
 
 ## M3 — Restaurant gameplay
 

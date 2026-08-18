@@ -61,6 +61,7 @@ export class RestaurantScene extends Phaser.Scene {
   private grid: Phaser.GameObjects.Graphics | null = null;
   private toolbar: Phaser.GameObjects.Container | null = null;
   private statusText: Phaser.GameObjects.Text | null = null;
+  private movePrev = new Map<string, PlacedItem>();
 
   private shopGroupIndex = 0;
   private shopItemIndex = 0;
@@ -71,6 +72,7 @@ export class RestaurantScene extends Phaser.Scene {
   }
 
   create(): void {
+    document.documentElement.dataset.scene = 'restaurant';
     const state = this.registry.get('gameState') as GameState | undefined;
     const catalog = this.registry.get('catalog') as ItemCatalog | undefined;
     const rpc = this.registry.get('rpc') as RpcClient | undefined;
@@ -182,12 +184,14 @@ export class RestaurantScene extends Phaser.Scene {
       numOutsideTilesX: 7,
       numOutsideTilesY: 6,
     });
+    let idSeq = 0;
     for (const owned of this.state.profile?.ownedItems ?? []) {
       if (getItemType(owned.globalItemId) !== ITEM_TYPE_RESTAURANT) continue;
       const entry = this.catalog.get(owned.globalItemId);
       const flags = entry?.flags;
       const item: RenderOwned = {
-        id: `owned-${owned.serverId}-${owned.globalItemId}-${owned.positionX}-${owned.positionY}`,
+        // serverId is unique per owned item; the suffix guards duplicates.
+        id: `owned-${owned.serverId}-${idSeq++}`,
         configId: String(owned.globalItemId),
         tileX: owned.positionX,
         tileY: this.roomTileY(owned),
@@ -247,6 +251,7 @@ export class RestaurantScene extends Phaser.Scene {
 
   private setStatus(text: string, color = '#9fd8e8'): void {
     this.statusText?.setText(text).setColor(color);
+    document.documentElement.dataset.status = text;
   }
 
   // --------------------------------------------------------------- camera
@@ -320,6 +325,8 @@ export class RestaurantScene extends Phaser.Scene {
   }
 
   private exitEditor(): void {
+    this.restoreAbandonedMoves();
+    this.renderItems();
     this.editing = false;
     this.editor = null;
     this.sink = null;
@@ -443,11 +450,25 @@ export class RestaurantScene extends Phaser.Scene {
 
   private pickUpItem(itemId: string): void {
     if (!this.editor) return;
+    const before = this.roomMap.get(itemId);
     const picked = this.editor.move(itemId);
-    if (!picked) return;
+    if (!picked || !before) return;
+    // Remember the pre-move state so an abandoned move can be restored
+    // (the original reverts the item on cancel — editor.md §Move).
+    this.movePrev.set(itemId, before);
     this.sprites.get(itemId)?.setVisible(false);
     this.ensureCursor();
     this.setStatus('moving item — click a valid tile');
+  }
+
+  /** Restores any moved-but-unplaced items before leaving the editor. */
+  private restoreAbandonedMoves(): void {
+    for (const [id, item] of this.movePrev) {
+      if (!this.roomMap.get(id)) {
+        this.roomMap.place(item);
+      }
+    }
+    this.movePrev.clear();
   }
 
   private ensureCursor(): void {

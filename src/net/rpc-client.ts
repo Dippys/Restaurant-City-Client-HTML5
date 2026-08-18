@@ -56,7 +56,9 @@ export class RpcClient {
     w.writeU8(0);
     w.writeU8(type);
     w.writeString(this.sessionId);
-    w.writeBytes(body);
+    // Single-call args are RAW after the session string (server
+    // parseRequest keeps the remainder as `args`) — no length prefix.
+    w.writeRaw(body);
     const response = await this.post(w.bytes());
     const r = new RpcReader(response);
     r.readU8(); // encapsulation
@@ -83,7 +85,8 @@ export class RpcClient {
     for (const sub of subs) {
       w.writeU8(sub.type);
       w.writeVarint(sub.body.length);
-      w.writeBytes(sub.body);
+      // Body bytes follow the length raw — writeBytes would prefix AGAIN.
+      w.writeRaw(sub.body);
     }
     const response = await this.post(w.bytes());
     const r = new RpcReader(response);
@@ -117,20 +120,32 @@ export class RpcClient {
 
   /** Handshake: getServerTime + init; adopts a non-empty init session id. */
   async handshake(): Promise<number> {
-    const responses = await this.sendBatch([
-      { type: 249, body: new Uint8Array(0) },
-      { type: 1, body: new Uint8Array(0) },
-    ]);
-    const timeResp = responses[0];
-    const initResp = responses[1];
-    if (timeResp === undefined || initResp === undefined) {
-      throw new RpcError('handshake batch returned too few responses');
+    // The original client retries init up to 2 more times on failure
+    // (GameInitLoader.as L163-182) — first-init server work can race.
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const responses = await this.sendBatch([
+          { type: 249, body: new Uint8Array(0) },
+          { type: 1, body: new Uint8Array(0) },
+        ]);
+        const timeResp = responses[0];
+        const initResp = responses[1];
+        if (timeResp === undefined || initResp === undefined) {
+          throw new RpcError('handshake batch returned too few responses');
+        }
+        const time = new RpcReader(timeResp.body).readDate();
+        const session = new RpcReader(initResp.body).readString();
+        if (session.length > 0) {
+          this.sessionId = session;
+        }
+        return time;
+      } catch (err) {
+        lastError = err;
+      }
     }
-    const time = new RpcReader(timeResp.body).readDate();
-    const session = new RpcReader(initResp.body).readString();
-    if (session.length > 0) {
-      this.sessionId = session;
-    }
-    return time;
+    throw lastError instanceof Error
+      ? lastError
+      : new RpcError(`handshake failed: ${String(lastError)}`);
   }
 }

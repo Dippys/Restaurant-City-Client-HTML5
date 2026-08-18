@@ -20,6 +20,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    document.documentElement.dataset.scene = 'boot';
     const url = new URL(window.location.href);
     if (url.searchParams.get('proof') === '1') {
       this.scene.start('proof');
@@ -44,6 +45,8 @@ export class BootScene extends Phaser.Scene {
 
   private setStatus(text: string, color = '#9fd8e8'): void {
     this.status?.setText(text).setColor(color);
+    // DOM hook for headless checks (canvas text is invisible to them).
+    document.documentElement.dataset.status = text;
   }
 
   private async run(): Promise<void> {

@@ -26,6 +26,7 @@ export class StreetScene extends Phaser.Scene {
   }
 
   create(): void {
+    document.documentElement.dataset.scene = 'street';
     const state = this.registry.get('gameState') as GameState | undefined;
     const catalog = this.registry.get('catalog') as ItemCatalog | undefined;
     if (!state || !catalog) {
@@ -68,10 +69,18 @@ export class StreetScene extends Phaser.Scene {
     const firstUserX = BUILDING_GAP;
     this.cameras.main.setBounds(0, 0, 8000, 800);
     this.cameras.main.scrollX = Math.max(0, firstUserX - 380);
+
+    // Input debug hook for headless checks (removed when input is stable).
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      document.documentElement.dataset.pointer = `${pointer.worldX},${pointer.worldY}`;
+    });
   }
 
   private renderBuilding(slotX: number, player: StreetPlayer, isOwn: boolean): void {
-    const group = this.add.container(slotX, 300);
+    // M2 layout: buildings anchored at the strip base (y=520) with the
+    // portrait panel above at PORTRAIT_Y. The exact AS3 sceneLayer offset
+    // is extracted later; this matches the visible original layout.
+    const group = this.add.container(slotX, 520);
 
     // Portrait panel above the building.
     group.add(
@@ -122,12 +131,14 @@ export class StreetScene extends Phaser.Scene {
         }
         group.add(sprite);
       }
-      group.setSize(340, 560);
-      group.setInteractive(
-        new Phaser.Geom.Rectangle(-170, -320, 340, 560),
-        Phaser.Geom.Rectangle.Contains,
-      );
-      group.on('pointerdown', () => {
+      // Transparent click target (child hit-testing is reliable; container
+      // hitArea hit-testing proved flaky in Phaser 3.90).
+      const clickTarget = this.add
+        .rectangle(0, -40, 340, 560, 0xffffff, 0.001)
+        .setInteractive({ useHandCursor: true });
+      group.add(clickTarget);
+      clickTarget.on('pointerdown', () => {
+        document.documentElement.dataset.building = 'own';
         this.scene.start('restaurant');
       });
     } else {
