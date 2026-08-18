@@ -103,6 +103,12 @@ Verified facts about the extraction (recorded so M1 reuses them):
 The loader (`src/net`/game layer) validates manifest entries and fails with
 actionable errors naming the missing file.
 
+**Phaser loading rule:** the JSON is a multi-atlas (`textures` array), so it
+MUST be loaded with `this.load.multiatlas(key, jsonUrl)` — `load.atlas`
+treats its second argument as a texture image URL and silently produces an
+empty/missing texture. `tests/lib/atlas-contract.test.mjs` guards the JSON
+shape the multiatlas loader consumes.
+
 ## Naming rules
 
 - Frame keys: `<sourceSwf>/<symbol>/<frameName>` lowercased, no spaces.
