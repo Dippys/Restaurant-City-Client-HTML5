@@ -113,6 +113,11 @@ the JSON file: Phaser's multiatlas loader resolves image URLs against
 must not pass a `path` argument to `multiatlas` — the JSON is
 self-contained. `tests/lib/atlas-contract.test.mjs` guards both rules.
 
+**Phaser animation rule:** `anims.create` frame entries are
+`{ key: <textureKey>, frame: <frameName> }`. A bare `{ key: 'x' }` treats
+`x` as a *texture* key and looks for frame 0 — the atlas frame key is the
+`frame`, and the texture key is the one passed to `load.multiatlas`.
+
 ## Naming rules
 
 - Frame keys: `<sourceSwf>/<symbol>/<frameName>` lowercased, no spaces.

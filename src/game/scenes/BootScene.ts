@@ -153,9 +153,14 @@ export class BootScene extends Phaser.Scene {
     }
 
     if (anim) {
+      // Phaser animation frames use { key: <textureKey>, frame: <frameName> } —
+      // a bare { key } is treated as a TEXTURE key, not a frame name.
       this.anims.create({
         key: 'm0-toggle',
-        frames: [{ key: anim.idle }, { key: anim.grey }],
+        frames: [
+          { key: 'ingredient', frame: anim.idle },
+          { key: 'ingredient', frame: anim.grey },
+        ],
         frameRate: 2,
         repeat: -1,
       });
