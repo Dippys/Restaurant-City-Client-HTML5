@@ -116,6 +116,14 @@ Verified facts about the extraction (recorded so M1 reuses them):
 The loader (`src/net`/game layer) validates manifest entries and fails with
 actionable errors naming the missing file.
 
+**Runtime URL rule:** manifest `data`/`audio`/`langs` `file` fields are
+relative to `public/assets/generated/` — the runtime URL is
+`/assets/generated/<file>`. (Atlas JSON `image` fields differ: they are
+site-root-relative because Phaser resolves them against `loader.path`.)
+Vite's SPA fallback answers unknown paths with 200 text/html, so fetch
+callers must check the response content type — otherwise misrouted asset
+URLs surface as baffling decode/parse errors.
+
 **Phaser loading rules:** the JSON is a multi-atlas (`textures` array), so it
 MUST be loaded with `this.load.multiatlas(key, jsonUrl)` — `load.atlas`
 treats its second argument as a texture image URL and silently produces an

@@ -17,6 +17,9 @@ interface ManifestJson {
 }
 
 const CENTER = 380;
+// Manifest data/audio/lang `file` fields are relative to
+// public/assets/generated/ (contract: docs/04-asset-pipeline.md).
+const GENERATED = 'assets/generated/';
 
 /**
  * M0/M1 proof scene: renders sprites from the pipeline-generated atlas,
@@ -160,8 +163,16 @@ export class BootScene extends Phaser.Scene {
     try {
       this.audioCtx ??= new AudioContext();
       if (!this.audioBuffer) {
-        const r = await fetch(`/${this.firstSfx}`);
+        const url = `/${GENERATED}${this.firstSfx}`;
+        const r = await fetch(url);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        // Vite's SPA fallback answers unknown paths with 200 text/html —
+        // guard the content type so a misrouted URL fails loudly instead of
+        // surfacing as a confusing decode error.
+        const type = r.headers.get('content-type') ?? '';
+        if (!type.includes('audio')) {
+          throw new Error(`unexpected content-type "${type}" for ${url}`);
+        }
         this.audioBuffer = await this.audioCtx.decodeAudioData(await r.arrayBuffer());
       }
       await this.audioCtx.resume();
