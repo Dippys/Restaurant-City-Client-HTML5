@@ -84,3 +84,54 @@ that too).
    whether the letterbox complaint is satisfied without any AS3 change.
 4. Keep any AS3 change a **bounded, ADR-documented release patch** per
    `docs/release.md` convention; never touch `original/`.
+
+## Experiment result (2026-08-28, branch `widescreen-support`)
+
+**Changes applied** (commits `bd260d1` on `decompiled/game`,
+`95cb792` on `Restaurant-City-Server`, docs on `client-html5`):
+
+- `Engine.STAGE_WIDTH` 760 → **1067** (16:9 at the shipped 600 height);
+  `STAGE_HEIGHT` stays 600. All `getStage*` helpers, `getSafeFullScreenSourceRect`
+  fallback, culling and `stageWidth/stageHeight` statics follow automatically.
+- `GameWorld.CANVAS_WIDTH` → `Engine.STAGE_WIDTH` (street actors, hire/scroll
+  panels, background tiling stay proportional; `CANVAS_HEIGHT`/`CANVAS_CENTER_Y`
+  unchanged).
+- `WorldStreet.canvasWidth` and `WorldRestaurant.canvasWidth` →
+  `Engine.STAGE_WIDTH` (street scene width; restaurant camera/centering).
+- `build.bat` + `asconfig.json` `default-size` → 1067x600 (SWF header).
+- `game.html` (both checkouts): `SWF_W` 760 → 1067, `.stage` `aspect-ratio`
+  → 1067/600, `@media (max-height: 720px)` ratio 1.2667 → 1.7783.
+
+**Verification (headless Chromium + Ruffle, viewport 1920x1080, account
+m2e2etest, captures in `client-html5/tests/.tmp/widescreen/`):**
+
+- Rebuilt `game.swf` = 521,779 B; SWF header parses as **1067x600** (was
+  760x600). Served from `server/public/swf/game.swf` (no restart needed —
+  `sendStaticFile` reads from disk per request).
+- Game boots and plays: full RPC startup (init, getUserProfile,
+  getAllFriends, getMails, getPricepoints…), all 7 asset SWFs + 14 data files
+  load, `pollEvents` loop runs; only pre-existing 404s are the missing
+  `/news0-2.png` newsletter images (same in the 760 baseline) and the dev.db
+  `SQLITE_CORRUPT` background-event writes (pre-existing torn DB; game reads
+  and gameplay unaffected).
+- **Letterbox removed:** column-variance profiles of the 1564x879 player box
+  show the 760 baseline leaves ~225px uniform margins per side (content
+  ~1060px), while the 1067 build renders street content **edge-to-edge**
+  (1564px, no uniform margins) — the widescreen fill works for the street.
+- Street layout code (`WorldStreet` sky/road/building-count, `GameWorld`
+  canvas width) makes the street genuinely wider, not stretched.
+- Restaurant: `WorldRestaurant.canvasWidth = 1067` keeps the room centered
+  (`room.x = canvasWidth/2`) and the camera clamps still contain it; the room
+  clip itself is the shipped size, so the wider stage shows the stage
+  background at the sides. Visual restaurant capture still pending (the
+  scripted click did not navigate into the room; click target depends on the
+  live street layout).
+- Rollback: `git -C decompiled/game checkout main -- bin/game.swf`, rebuild
+  page values back to 760, copy SWF to `server/public/swf/game.swf`.
+
+**Open questions for the next round:** restaurant interior visual check;
+fullscreen path (browser fullscreen → `getBestFitFullScreenSourceRect` with
+the 1067 rect); mouse↔world mapping in the wider stage; whether to keep 1067
+or tune to another width (960 = 16:10); HUD spread (economy bar, bottom
+panels anchor via the stage-edge helpers and will sit at the new edges by
+design).
