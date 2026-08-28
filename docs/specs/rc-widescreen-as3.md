@@ -135,3 +135,46 @@ the 1067 rect); mouse↔world mapping in the wider stage; whether to keep 1067
 or tune to another width (960 = 16:10); HUD spread (economy bar, bottom
 panels anchor via the stage-edge helpers and will sit at the new edges by
 design).
+
+## Round 3 — restaurant verified in widescreen (2026-08-28)
+
+**Two test-only patches were needed for deterministic headless capture**
+(commits `c1b3f0d`, `77662d8` on `decompiled/game` — revert before release):
+
+- `GameWorld.EMAIL_PERMISSION_REMINDER_POP_UP_CHANCE` 0.5 → 0 and
+  `NETPROMOTER_POP_UP_CHANCE` 0.0005 → 0. The email popup stopped the intro
+  logo 50% of the time, freezing the street intro (the popup's tick/cancel
+  is the only way to resume; headless clicks missed it). With popups
+  disabled the intro runs to completion.
+- `WorldStreet.tick`: `++introTickCount > 150` forces the intro logo
+  completion after ~6s as a safety net (the logo stalled under Ruffle in
+  some runs; with popups gone it completes naturally).
+
+**Verified with the deterministic build (521,804 B, served at :8090):
+`[RC-PERF]` marks prove the world flow** — `WorldStreet.showNotify begin
+intro=true` at +4.4s, then `WorldRestaurantPlay constructor begin
+visitMode=false` → `WorldRestaurant.loadRoom end placedItems=33` →
+`WorldRestaurantPlay.init end chairs=3 kitchens=1` →
+`WorldRestaurantPlay.showNotify begin` at ~+8.7s: the **player's restaurant
+loads in the 1067x600 build with no crash**.
+
+**Captures (1920x1080 viewport, `client-html5/tests/.tmp/widescreen/`):**
+
+- `widescreen-r6-street.png` — clean intro street (sky, buildings, road,
+  bottom toolbar): **edge-to-edge content**, no letterbox (colprofile all
+  `#`).
+- `widescreen-r6-restaurant.png` — the restaurant interior: **edge-to-edge**
+  too; 16.7% pixel similarity to the street capture (distinct scenes).
+- `baseline-street.png` (760 SWF, same box) — ~220px uniform margins per
+  side: the letterbox the 1067 build removes.
+
+**Tooling:** `tools/capture-worlds.mjs` (deterministic street+restaurant
+capture), `tools/probe-marks-to-file.mjs` (world marks to file),
+`tools/probe-worldflow.mjs`, `tools/strip-shot.cjs`, `tools/ascii-shot.cjs`,
+`tools/colprofile.cjs` committed on `client-html5` for repeatable
+verification.
+
+**Remaining follow-ups:** mouse↔world mapping in the wider stage (clicks
+work — the game navigated and loaded — but a click-to-place/select parity
+check is pending); fullscreen-mode visual; width tuning (1067 vs 960); the
+"back to street" toolbar navigation for a post-intro street capture.
