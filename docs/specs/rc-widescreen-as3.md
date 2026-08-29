@@ -178,3 +178,30 @@ verification.
 work — the game navigated and loaded — but a click-to-place/select parity
 check is pending); fullscreen-mode visual; width tuning (1067 vs 960); the
 "back to street" toolbar navigation for a post-intro street capture.
+
+## Round 4 — fullscreen + input mapping verified; width decision (2026-08-28)
+
+- **Fullscreen fills the screen.** Gesture-triggered browser fullscreen
+  (same code path the page's `rcToggleFullscreen` uses): the `.stage` box
+  becomes 1920x1080 and the Ruffle element 1920x1079; the fullscreen
+  screenshot's column profile is content edge-to-edge across the whole
+  width — **no letterbox bars in fullscreen** with the 1067x600 build
+  (`fs-r1-fullscreen.png`).
+- **Mouse input maps correctly in the wider stage.** Dragging at the exact
+  code-predicted zoom-lever position (`mc_zoom.x = getStageRight() - 16` =
+  logical 1051 → screen x 1540.6 in the 1564px box) produced a coherent
+  camera response — the diff-map between before/after shows one large
+  changed region (room pan/zoom), not scattered animation (`zoom2-before/
+  after.png`, 29% pixel similarity). Ruffle's screen→logical coordinate
+  mapping is proportional, so the wider stage changes nothing about input
+  mapping.
+- **Width decision: keep 1067 (16:9).** Fit math across common resolutions:
+  1067x600 fills 1920x1080/2560x1440/1366x768 with 0–1px bars (16:10 screens
+  get a 61px top/bottom bar); 960x600 (16:10) leaves 96–128px side bars on
+  the dominant 16:9 monitors. 1067 is the right widescreen choice.
+
+**All main views are now verified in the 1067x600 build:** street (in-page),
+restaurant (in-page), fullscreen, and input interaction. Open cosmetics:
+post-intro street via the toolbar button (positions are baked in the
+`RoomUiButton`/`StreetViewButtonLayer2` art), and the user's own play-test
+at http://localhost:8090/game (the widescreen build is live).
