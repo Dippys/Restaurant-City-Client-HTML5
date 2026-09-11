@@ -6,7 +6,17 @@ branch `widescreen-support`). The goal is to make the *AS3 game* (played
 through Ruffle) use widescreen monitors without the 4:3 letterbox — **not** the
 HTML5 TypeScript rebuild.
 
-Status: **branch scaffolded; no widescreen code changed yet.**
+> **Status: REVERTED / ABANDONED (2026-09-11).** The operator reverted this
+> experiment: the original client stays on its shipped **1:1 760×600** stage.
+> The AS3 mutation never left the unmerged `decompiled/game`
+> `widescreen-support` branch, so **no AS3 source revert was needed** — but the
+> experiment's build leaked into the gitignored derived store
+> `server/public/swf/game.swf`, which has been serving **1067×600** to the local
+> `:8090` Ruffle page. See ["Round 5 — reverted"](#round-5--reverted-2026-09-11)
+> at the end of this file. Everything below is the historical record of the
+> experiment and is **not** a description of the shipped client.
+
+Status at the time of the experiment: **branch scaffolded; no widescreen code changed yet.**
 
 ## Current geometry (source of truth)
 
@@ -205,3 +215,188 @@ restaurant (in-page), fullscreen, and input interaction. Open cosmetics:
 post-intro street via the toolbar button (positions are baked in the
 `RoomUiButton`/`StreetViewButtonLayer2` art), and the user's own play-test
 at http://localhost:8090/game (the widescreen build is live).
+
+## Round 5 — reverted (2026-09-11)
+
+Operator decision: the original (AS3/decompiled) client goes **back to its
+shipped 1:1 760×600 stage**; the widescreen experiment is not pursued. This
+section is the record of the revert and of the artifact that had to be found
+to make it real.
+
+### 1. What the widescreen mutation actually was (inventory)
+
+All of it lives on the `decompiled/game` branch **`widescreen-support`**, which
+was cut from `main`'s parent `9f2a003` and **was never merged into `main`**.
+`git diff main widescreen-support --stat` = 7 files:
+
+| File (branch `widescreen-support`) | Line(s) | Change | Kind |
+|---|---|---|---|
+| `scripts/com/playfish/games/cooking/Engine.as` | 39–42 | comment + `STAGE_WIDTH:int = 760` → `1067` (`STAGE_HEIGHT` stays 600) | widescreen |
+| `scripts/com/playfish/games/cooking/GameWorld.as` | 111–114 | `CANVAS_WIDTH:int = 760` → `Engine.STAGE_WIDTH` | widescreen |
+| `scripts/com/playfish/games/cooking/GameWorld.as` | 122–129 | `NETPROMOTER_POP_UP_CHANCE` `0.0005` → `0`; `EMAIL_PERMISSION_REMINDER_POP_UP_CHANCE` `0.5` → `0` | **test-only gameplay patch** |
+| `scripts/com/playfish/games/cooking/WorldStreet.as` | 104–106 | `private var canvasWidth:int = 760` → `Engine.STAGE_WIDTH` | widescreen |
+| `scripts/com/playfish/games/cooking/WorldStreet.as` | 116–119 | new `private var introTickCount:int = 0` | **test-only gameplay patch** |
+| `scripts/com/playfish/games/cooking/WorldStreet.as` | 777 | `if(logoMovieClip.currentFrame >= logoMovieClip.totalFrames \|\| ++introTickCount > 150)` — force-completes the street intro after ~6 s | **test-only gameplay patch** |
+| `scripts/com/playfish/games/cooking/WorldRestaurant.as` | 198–200 | `public var canvasWidth:Number = 760` → `Engine.STAGE_WIDTH` | widescreen |
+| `build.bat` | 42 | `-default-size 760 600` → `1067 600` (SWF header) | widescreen |
+| `asconfig.json` | 16–17 | `"width": 760` → `1067` | widescreen |
+| `bin/game.swf` | — | rebuilt artifact: 521,779 → (c1b3f0d) 521,767 → (77662d8) 521,804 B | artifact |
+
+Everything that widens the visible area is the single `STAGE_WIDTH` constant
+plus the three `canvasWidth`/`CANVAS_WIDTH` fields that had to follow it, and
+the compile-time `-default-size` that sets the SWF header RECT. No `scaleMode`,
+viewport-offset, or stage-rectangle logic was touched anywhere — the shipped
+`getStage*()`/`setFullScreen()` helpers already derive everything from
+`STAGE_WIDTH`.
+
+**Sanctioned patch in the same file — kept, and how it is separated.**
+`Engine.as` also carries the sanctioned **"Fullscreen payout-loop safety"**
+patch (`../../docs/release.md`): `getSafeFullScreenSourceRect()` at
+`main:Engine.as` 104–122, whose fallback is
+`new Rectangle(instance.gameOffsetX, instance.gameOffsetY, STAGE_WIDTH, STAGE_HEIGHT)`.
+The widescreen branch did **not** edit a single line of it — but because that
+fallback reads `STAGE_WIDTH`, widening the constant silently changed the
+sanctioned patch's fallback rectangle from 760×600 to 1067×600. This is worth
+naming: a one-constant "cosmetic" change can alter the behaviour of an
+unrelated sanctioned patch without touching it, so constant-level diffs need a
+call-site audit, not just a line diff. `git grep -n -e 1067 -e widescreen main`
+is clean, so no such coupling survives on the release line.
+
+### 2. Revert method — and why there was nothing to revert in the source
+
+**Method: git-ancestry audit, not `git revert`.** The widescreen commits
+(`bd260d1`, `c1b3f0d`, `77662d8`) are *not* ancestors of `main`, so there was
+no hunk to undo:
+
+- `git -C decompiled/game merge-base main widescreen-support` → `9f2a003`
+  (`main` = `9f2a003` + the cherry-picked `28af3c2` "smal fix" = `a18b256`).
+- `git log --oneline main` contains none of the three widescreen commits.
+- `git diff 9f2a003 main --stat` = only `README.md` and
+  `scripts/com/playfish/games/cooking/GameUser.as` (the sanctioned ADR-0042
+  trade-safety patch) — no widescreen file appears.
+- `git diff main widescreen-support -- scripts/.../GameUser.as` is **empty**,
+  i.e. the sanctioned ADR-0042 patch is byte-identical on both lines and was
+  not collateral damage of the experiment.
+- Working tree: `build.bat` L42 `-default-size 760 600`, `asconfig.json` L16
+  `"width": 760`, `Engine.as` L39 `STAGE_WIDTH: int = 760` — already 1:1.
+
+Conclusion: **`decompiled/game` was already on the 1:1 release line; the
+widescreen mutation never reached it.** Nothing was reconstructed by guesswork
+and no pristine-copy restoration was needed (`original/` ships only the 2010
+SWFs/data, no AS3 source, so guess-free restoration would not have been
+possible anyway — the git history is what makes this revert exact).
+
+The branch itself is left in place as the experiment's record (it is also
+pushed to `origin/widescreen-support`); it must never be merged or built for
+release. `git branch -D widescreen-support` only removes the local ref.
+
+### 3. The actual leak: a gitignored derived artifact
+
+Source discipline did **not** protect the thing players run. The widescreen
+build was copied over the derived store (`client-html5/docs/status.md`,
+2026-08-28 rows: "deployed to `server/public/swf/game.swf` +
+`Restaurant-City-Server/public/swf/`"), and `server/public/swf` is
+**gitignored** (`server/.gitignore:11`), so nothing recorded or repaired it.
+
+Artifact truth table (stage parsed from the SWF header RECT; build time read
+from the Flex `ProductInfo` tag 41 stamp, which is independent of file mtime):
+
+| Artifact | Bytes | SHA-256 | Stage | Compiled (UTC) |
+|---|---|---|---|---|
+| `original/swf/game.swf` | 513,510 | `B10D6422D1E4496B2E2CC88781B2000CD1117BD64CF0949AD12877214EBF5CBB` | 760×600 @25 | 2010-02-10T17:34:43Z |
+| `decompiled/game/bin/game.swf` (worktree) | 521,772 | `B96EA0C3ED4B528DDFAB9DCB6042016D96A5BD31B8FB7140353BB13D16298A98` | 760×600 | 2026-08-31T17:39:10Z |
+| `Restaurant-City-Server/public/swf/game.swf` | 521,772 | `B96EA0C3…698A98` | 760×600 | 2026-08-31T17:39:10Z |
+| `Maggie/assets/swf/game.swf` | 521,772 | `B96EA0C3…698A98` | 760×600 | 2026-08-31T17:39:10Z |
+| **live `https://rc-reborn.uk/game.swf`** | 521,772 | `B96EA0C3…698A98` | 760×600 | 2026-08-31T17:39:10Z |
+| **`server/public/swf/game.swf`** | **521,804** | **`6DA0467EB2DC034C8F78AE6B63C687366B2F15CE35FED0709B152BD1DCE291DB`** | **1067×600** | 2026-08-28T13:37:57Z |
+
+`server/public/swf/game.swf` is **byte-identical to `git show
+widescreen-support:bin/game.swf`** (same SHA-256), i.e. it is the branch-head
+build from 2026-08-28 17:37:57 +04 — 11 minutes before `77662d8` was committed
+at 17:48:55 +04. So the local `:8090` Ruffle page has been playing the
+widescreen test build, and that build is not just wider: probing the inflated
+ABC of that artifact shows the `introTickCount` symbol **present** and the
+`0.0005` double **absent**, i.e. it carries both test-only gameplay patches
+(forced intro completion; NetPromoter popup disabled). A same-path comparison
+against the 760×600 release build is the reverse on both probes.
+
+Answer to the drift question: the served copy is not "older", it is a different
+*variant* — a leftover widescreen experiment build that was never restored
+after the experiment ended. It matches no hash in the ADRs or
+`../../docs/release.md` for exactly that reason: it was never a release build.
+
+**Production was never widescreen.** `https://rc-reborn.uk/game.swf` serves
+521,772 B / `B96EA0C3…` / 760×600 — the ADR-0046 release build. The widescreen
+variant exists only in the workspace's own `server/public/swf/` and therefore
+only ever affected the local dev page.
+
+### 4. Verification of the 1:1 build
+
+Rebuilt from the `decompiled/game` working tree (release line + the sanctioned
+ADR-0046 photo patch) with the canonical flags, to a scratch output so the
+released `bin/game.swf` was not disturbed:
+
+```bat
+java -jar C:\flex\lib\mxmlc.jar +flexlib="C:\flex\frameworks" -load-config= ^
+  -source-path+="decompiled\game\scripts" ^
+  -external-library-path+="C:\flex\frameworks\libs\player\25.0\playerglobal.swc" ^
+  -target-player=25.0 -swf-version=25 -default-size 760 600 ^
+  -default-frame-rate=25 -static-link-runtime-shared-libraries=true ^
+  -includes+=away3d.events.BillboardEvent -warnings=false -debug=false ^
+  -output="<scratch>\game.swf" -- "decompiled\game\scripts\com\playfish\games\cooking\Engine.as"
+```
+
+Exit code 0. The built artifact parses as **760×600 @ 25 fps** (RECT
+`xmin=0 xmax=15200 ymin=0 ymax=12000` twips — byte-for-byte the same RECT as
+`original/swf/game.swf`), 521,773 B / `3113497FB600899BD999100A5003F664C04DE1B919D8F0FD98FBD11E7E2E080E`.
+
+**The rebuild is not byte-reproducible, but it is bytecode-identical.** Two
+consecutive builds of unchanged source produce different bytes (521,773 B and
+521,777 B), and inflating all of them shows the *body* is identical in length
+(1,103,774 B) with exactly **4 differing bytes** at body offset 50–53 — inside
+the Flex `ProductInfo` tag (SWF tag 41), whose last `UI64` field is the
+**compile timestamp in ms**. Against the released `bin/game.swf` the same
+4-byte delta is the only difference in the entire file: every ABC byte, every
+class, and every constant is identical. So `B96EA0C3…` can never be reproduced
+by rebuilding (its own stamp dates it to the 2026-08-31 build), and the correct
+way to check a rebuild is to compare inflated bodies ignoring that stamp — not
+to compare hashes.
+
+**Artifact-level check — decompiled, not inferred.** FFDec 26.2.1
+(`java -jar "C:\Program Files (x86)\FFDec\ffdec-cli.jar" -selectclass <class> -export script <dir> <swf>`)
+on the rebuilt SWF and on the served widescreen SWF:
+
+| Decompiled from | `Engine.STAGE_WIDTH` | `GameWorld.CANVAS_WIDTH` | `NETPROMOTER_POP_UP_CHANCE` | `EMAIL_PERMISSION_REMINDER_POP_UP_CHANCE` | `WorldStreet.canvasWidth` | `WorldStreet.introTickCount` |
+|---|---|---|---|---|---|---|
+| rebuilt SWF (this round) | `760` | `760` | `0.0005` (shipped) | `0.5` (shipped) | `760` | absent |
+| `server/public/swf/game.swf` | `1067` | `Engine.STAGE_WIDTH` | `0` | `0` | `1067` | present (`++introTickCount > 150`) |
+
+So the shipped values are confirmed in the *compiled code* of the rebuild, not
+just in its header RECT — and the widescreen mutation, including both test-only
+gameplay patches, is directly visible in the served build's compiled classes.
+(`npm run check` — `tsc --noEmit` — also passes on the `client-html5` tree at
+the commit that records this revert; the change is docs-only.)
+
+What a rebuild does **not** prove, without a browser: Ruffle renders whatever
+the SWF declares, so "the header is 760×600 and the bytecode matches the
+released 1:1 build" is as far as static evidence goes. The letterbox-free
+rendering the experiment's captures showed is a property of the page's `.stage`
+box math plus the SWF header size; someone has to look at a real client to
+confirm the shipped 1:1 behaviour is back end-to-end.
+
+### 5. What to do to finish the revert (operator)
+
+Replace the one wrong derived copy; everything else already matches the
+release line:
+
+```powershell
+Copy-Item 'decompiled\game\bin\game.swf' 'server\public\swf\game.swf' -Force
+```
+
+Then reload `http://localhost:8090/game` (no server restart is needed —
+`sendStaticFile` reads from disk per request). Expected after the copy:
+521,772 B, `B96EA0C3ED4B528DDFAB9DCB6042016D96A5BD31B8FB7140353BB13D16298A98`,
+760×600. Nothing needs to change on the box for the AS3 client: production,
+`Maggie/assets/swf/`, and `Restaurant-City-Server/public/swf/` already serve
+that build. `docs/release.md` records that **this widescreen mutation was never
+part of the sanctioned patch set**.
