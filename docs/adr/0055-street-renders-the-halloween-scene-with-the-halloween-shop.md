@@ -186,6 +186,22 @@ Halloween street today, and reverts by itself when the operator rotates back.
   branch, or the same trick with different rows; the pattern is now documented
   rather than rediscovered.
 
+## Addendum — one visible side effect worth naming: the skyline repeat period changes
+
+Not a defect and not a break, but a reviewer should know it before looking at the
+street. `ui/BackgroundLayer.addLayer` (`:21-41`) does not stretch a background
+clip: it instantiates `ceil(GameWorld.CANVAS_WIDTH / clip.width) + 2` copies side
+by side (`:27-35`) and `setX()` parallax-wraps them by `param1 / divider %
+mcWidth`. The two scenes share four of their five background layers — `mc_sky`
+(StreetSky 1940), `mc_cloud` (Clouds 760) and `mc_road` (SidewalkRoad 1965) are
+identical character ids, and the road is the widest of them at 640 px — but the
+mid layer differs in width: **`CityScape` 727 is 873 px wide and
+`HalloWeenCityScape` 1961 is 700 px**, so its tile count changes from `ceil(760 /
+873) + 2 = 3` to `ceil(760 / 700) + 2 = 4` and the skyline repeats every 700 px
+instead of every 873 px. The silhouette is the intended change; the tighter repeat
+is a consequence of the art being narrower, and it is the one thing about this
+patch that a human should look at first.
+
 ## Evidence
 
 - AS3 citation (original behaviour): `decompiled/game/scripts/com/playfish/games/cooking/WorldStreet.as:226-237`
