@@ -55,6 +55,9 @@ Never commit with `check` or `test` red.
 7. **Definition of done** (per change): `check` + `test` green, `build`
    succeeds, docs/status updated, evidence linked where the change is
    user-visible.
+8. **An absence is not evidence.** A zero, a clean diff or an empty match
+   needs the positive control workspace rule 9 requires, trap table included
+   (`../../AGENTS.md`).
 
 ## Session rhythm
 
