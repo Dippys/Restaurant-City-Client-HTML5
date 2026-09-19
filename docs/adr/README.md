@@ -46,11 +46,13 @@ decision by adding a new ADR that supersedes this one.
 | [0039](0039-owned-item-key-repair.md) | Repair and prevent OwnedItem primary-key/serverId drift |
 | [0040](0040-admin-shop-control-item-overrides.md) | Admin shop control via item overrides (superseded by ADR-0041) |
 | [0041](0041-db-backed-game-data-generation.md) | DB-backed game data: re-index assets, regenerate at serve time (supersedes ADR-0040) |
+| [0042](0042-trade-safety-ingredient-locks.md) | Trade safety — friend-only direct trades, no NPC minting, received ingredients start locked |
 | [0044](0044-deterministic-anomaly-reporting.md) | Restrict anomaly reporting to deterministic evidence |
 | [0045](0045-authoritative-sales-and-zero-ingredient-cleanup.md) | Authoritative item sales, zero-ingredient cleanup, and robust fallback recovery |
 | [0046](0046-native-photo-download.md) | Native browser download replaces Facebook photo upload |
 | [0050](0050-employee-food-save-audit-semantics.md) | Employee-food save-audit semantics (narrowly supersedes ADR-0035) |
 | [0051](0051-throttle-automatic-save-checkpoints.md) | Throttle automatic pre-save checkpoints and define save-fact checkpoint anchors |
 | [0052](0052-persistent-click-selected-item-rotation.md) | Persistent click-selected rotation in the Flash restaurant editor |
+| [0053](0053-failed-rpc-batch-is-dropped.md) | A failed RPC batch is dropped, and a queued save keeps its prompt |
 | [0054](0054-a-failed-profile-load-is-surfaced-not-substituted.md) | A failed profile load is retried, then told — never a Dummy stand-in |
 | [0055](0055-street-renders-the-halloween-scene-with-the-halloween-shop.md) | The street renders the Halloween variant while the shop's Halloween decor is obtainable |
